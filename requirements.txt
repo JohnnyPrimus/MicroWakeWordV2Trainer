@@ -1,0 +1,31 @@
+# Core ML dependencies
+tensorflow>=2.13.0
+tensorflow-model-optimization>=0.7.0
+
+# Audio processing
+librosa>=0.10.0
+soundfile>=0.12.1
+audioread>=3.0.0
+numpy>=1.24.0
+scipy>=1.10.0
+
+# Piper TTS sample generation
+piper-tts>=1.2.0
+piper-phonemize>=1.1.0
+
+# Wyoming protocol
+wyoming>=1.5.4
+
+# Training utilities
+tqdm>=4.65.0
+PyYAML>=6.0
+requests>=2.31.0
+
+# Jupyter
+jupyter>=1.0.0
+ipywidgets>=8.0.0
+matplotlib>=3.7.0
+
+# Dataset augmentation
+audiomentations>=0.33.0
+pyroomacoustics>=0.7.3

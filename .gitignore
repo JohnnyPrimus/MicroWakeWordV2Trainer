@@ -427,3 +427,13 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# MicroWakeWordV2Trainer generated artifacts
+samples/
+features/
+piper_models/
+output/
+.ipynb_checkpoints/
+*.npy
+*.tflite
+*.onnx
