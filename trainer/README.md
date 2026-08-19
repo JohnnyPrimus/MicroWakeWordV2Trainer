@@ -208,7 +208,7 @@ config (default 128).
 
 ---
 
-##*Running the pipeline*
+## Running the pipeline
 
 All commands default to `--config trainer/wakeword_config.yaml`; pass
 `--config <path>` to point at a different file (e.g. to train several wake
