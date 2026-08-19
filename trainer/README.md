@@ -7,8 +7,8 @@ impulse responses, turn that into spectrogram features, and train a
 [microWakeWord](https://github.com/kahrendt/microWakeWord) model — as a
 plain Python CLI you run on your own machine instead of in a Colab VM.
 
-I will try to provide updates to simplify and streamline the proccess, but, for not,
-it produces V2 microWakeWorks of your choosing at no cost and with no limitations.
+I will try to provide updates to simplify and streamline the proccess, but for now,
+it simply produces V2 microWakeWorks of your choosing at no cost and with no limitations.
 
 ## What it does differently from the baseline notebook
 
