@@ -19,6 +19,11 @@ import yaml
 class WakeWordConfig:
     phonetic: str
     friendly_name: str
+    # Extra phonetic spellings of the same wake word. Each gets its own full
+    # batch of piper.max_samples generated samples (see generate_samples.py),
+    # accumulating alongside the primary `phonetic` spelling's samples -
+    # more phonetic variety generally improves model robustness.
+    additional_phonetics: List[str] = dataclasses.field(default_factory=list)
 
 
 @dataclasses.dataclass
@@ -120,6 +125,13 @@ class TrainerConfig:
     @property
     def samples_dir(self) -> Path:
         return self.workspace / "generated_samples" / self.wake_word.friendly_name
+
+    @property
+    def preview_dir(self) -> Path:
+        # Deliberately outside samples_dir's tree: build_features.py globs
+        # samples_dir recursively for training data, and preview clips
+        # shouldn't leak into that.
+        return self.workspace / "preview_samples" / self.wake_word.friendly_name
 
     @property
     def rir_dir(self) -> Path:

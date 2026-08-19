@@ -36,7 +36,9 @@ def _build_clips_and_augmenter(config: TrainerConfig):
 
     clips = Clips(
         input_directory=str(config.samples_dir),
-        file_pattern="*.wav",
+        # Recursive: generate_samples.py writes each phonetic spelling's
+        # batch into its own subdirectory (samples_dir/<slug>/*.wav).
+        file_pattern="**/*.wav",
         max_clip_duration_s=None,
         remove_silence=False,
         random_split_seed=10,
@@ -72,7 +74,7 @@ def run(config: TrainerConfig) -> None:
     from microwakeword.audio.spectrograms import SpectrogramGeneration
     from mmap_ninja.ragged import RaggedMmap
 
-    if not any(config.samples_dir.glob("*.wav")):
+    if not any(config.samples_dir.glob("**/*.wav")):
         raise FileNotFoundError(
             f"No wake word samples found in {config.samples_dir}. "
             "Run the 'generate-samples' step first."

@@ -14,6 +14,10 @@ wake_word:
   phonetic: "hey wabi"
   # Directory-safe name used for all generated files/folders (use _ for spaces).
   friendly_name: "hey_wabi"
+  # Optional: extra phonetic spellings of the same wake word. Each gets its
+  # own full batch of samples generated (see `piper.max_samples` below) -
+  # more phonetic variety generally improves model robustness.
+  additional_phonetics: []
 
 # All downloaded/generated data and trained models live under this directory.
 # Relative paths are resolved relative to this config file's location.
