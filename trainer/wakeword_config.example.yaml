@@ -1,0 +1,75 @@
+# Example config for the local microWakeWord training pipeline
+# (trainer/local/). Copy this to wakeword_config.yaml and edit the
+# wake_word section at minimum, then run:
+#
+#   python -m trainer.local.cli all --config trainer/wakeword_config.yaml
+#
+# Individual steps can also be run on their own (setup, generate-samples,
+# download-data, build-features, train, export) - see trainer/README.md.
+
+wake_word:
+  # Phonetic spelling fed to the Piper TTS sample generator. Spell out
+  # numbers, avoid special characters. Generate a single sample and listen
+  # to it (see README) before committing to a spelling.
+  phonetic: "hey wabi"
+  # Directory-safe name used for all generated files/folders (use _ for spaces).
+  friendly_name: "hey_wabi"
+
+# All downloaded/generated data and trained models live under this directory.
+# Relative paths are resolved relative to this config file's location.
+workspace: "workspace"
+
+piper:
+  max_samples: 1000
+  batch_size: 100
+  max_speakers: 100
+  noise_scales: [0.667]
+  noise_scale_ws: [0.667]
+  length_scales: [0.85, 1.0, 1.15]
+
+datasets:
+  # Set to null to include both balanced and unbalanced Audioset splits,
+  # but that needs 200GB+ of free disk space.
+  audioset_split: "bal_train"
+  download_processes: 3
+  download_retries: 3
+  # Name of the environment variable holding a Hugging Face API token.
+  # Not required, but avoids rate limiting.
+  hf_token_env: "HF_TOKEN"
+
+augmentation:
+  duration_s: 3.2
+  probabilities:
+    SevenBandParametricEQ: 0.1
+    TanhDistortion: 0.1
+    PitchShift: 0.1
+    BandStopFilter: 0.1
+    AddColorNoise: 0.1
+    AddBackgroundNoise: 0.75
+    Gain: 1.0
+    RIR: 0.5
+  background_min_snr_db: -5
+  background_max_snr_db: 10
+  min_jitter_s: 0.195
+  max_jitter_s: 0.205
+
+training:
+  training_steps: [10000]
+  positive_class_weight: [1]
+  negative_class_weight: [20]
+  learning_rates: [0.001]
+  batch_size: 128
+  eval_step_interval: 500
+  clip_duration_ms: 1500
+  target_minimization: 0.9
+  minimization_metric: null
+  maximization_metric: "average_viable_recall"
+  model: "mixednet"
+  model_args:
+    pointwise_filters: "64,64,64,64"
+    repeat_in_block: "1, 1, 1, 1"
+    mixconv_kernel_sizes: "[5], [7,11], [9,15], [23]"
+    residual_connection: "0,0,0,0"
+    first_conv_filters: 32
+    first_conv_kernel_size: 5
+    stride: 3

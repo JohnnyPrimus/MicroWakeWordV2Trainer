@@ -427,3 +427,16 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+
+#Ignore vscode AI rules
+.github\instructions\codacy.instructions.md
+
+# Local microWakeWord trainer (trainer/local/): downloaded datasets, cloned
+# repos, generated samples/features, and trained/exported models all live
+# under each config's workspace directory and shouldn't be committed.
+trainer/workspace/
+trainer/wakeword_config.yaml
+__pycache__/
+*.pyc
+

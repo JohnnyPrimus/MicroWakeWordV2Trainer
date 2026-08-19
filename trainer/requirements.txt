@@ -1,0 +1,23 @@
+# Bootstrap dependencies needed to run trainer/local/cli.py itself and the
+# download-data step. Everything else (tensorflow, mmap_ninja, audiomentations,
+# torch, etc.) is installed by `python -m trainer.local.cli setup`, which pulls
+# in microWakeWord's and piper-sample-generator's own dependency lists rather
+# than duplicating pins here.
+#
+# Deliberately NOT using the `datasets` library for downloads: a new enough
+# version to read Audioset's current parquet schema requires `torchcodec` for
+# audio decode/encode, which needs a system FFmpeg install that isn't present
+# by default on Windows. huggingface_hub + pyarrow + soundfile cover the same
+# ground without that dependency.
+pyyaml
+huggingface_hub
+pyarrow
+soundfile
+numpy
+scipy
+
+# The `webrtcvad`/`webrtcvad-wheels` packages (pulled in transitively by
+# piper-sample-generator and microWakeWord) still do `import pkg_resources`
+# at module load time. setuptools removed that shim in 81.0 - pin below it
+# so microwakeword.audio.audio_utils (used by build-features) can import.
+setuptools<81
