@@ -1,4 +1,4 @@
-# Local microWakeWord Trainer
+# Local microWakeWord Trainer (No Google Colab required)
 
 A local, script-driven alternative to `trainer/microwakeword_trainer_colab.ipynb`.
 It runs the same underlying pipeline as the Colab notebook — synthesize wake
