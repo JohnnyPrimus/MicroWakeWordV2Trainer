@@ -27,6 +27,10 @@ plain Python CLI you run on your own machine instead of in a Colab VM.
   [Troubleshooting](#troubleshooting--why-does-setup-do-all-that) below) that
   the original notebook doesn't have to deal with, since Colab's VM image
   and package versions are fixed at the time the notebook was written.
+- **Menu-driven by default.** `python -m trainer.local.cli` (no arguments)
+  launches an interactive menu that runs every step below in order and only
+  stops to ask you something when a step genuinely needs a human decision -
+  see [Running the pipeline](#running-the-pipeline).
 
 ## Pipeline overview
 
@@ -95,16 +99,14 @@ differs. Pick whichever section matches how you want to run it.
    and `wake_word.friendly_name`. See the comments in
    `trainer\wakeword_config.example.yaml` for what every other field does.
 
-4. Install the rest of the toolchain (microWakeWord, piper-sample-generator,
-   the Piper voice checkpoint):
+4. Launch the interactive menu - it installs the rest of the toolchain
+   (microWakeWord, piper-sample-generator, the Piper voice checkpoint) as its
+   first step, then walks you through the rest of the pipeline. See
+   [Running the pipeline](#running-the-pipeline) below.
 
    ```powershell
-   python -m trainer.local.cli setup
+   python -m trainer.local.cli
    ```
-
-5. Run the pipeline steps in order - see [Running the pipeline](#running-the-pipeline)
-   below. All commands are the same `python -m trainer.local.cli <command>`
-   form shown there.
 
 ---
 
@@ -195,9 +197,11 @@ differs. Pick whichever section matches how you want to run it.
    list is empty, re-check steps 2-3 and step 8's `tensorflow[and-cuda]`
    install.
 
-10. Run the pipeline steps in order - see below. Commands are `python3 -m
-    trainer.local.cli <command>` inside WSL (same as Windows, just `python3`
-    instead of `python`).
+10. Launch the interactive menu for the rest of the pipeline - see
+    [Running the pipeline](#running-the-pipeline) below. It's `python3 -m
+    trainer.local.cli` inside WSL (same as Windows, just `python3` instead of
+    `python`). Its first step re-runs `setup`, which is safe here too - it
+    won't touch the CUDA-enabled TensorFlow you just installed in step 8.
 
 If your GPU has limited VRAM (e.g. a laptop GPU with 6-8 GB), and training
 fails with an out-of-memory error, lower `training.batch_size` in the
@@ -207,12 +211,33 @@ config (default 128).
 
 ## Running the pipeline
 
-All commands default to `--config trainer/wakeword_config.yaml`; pass
-`--config <path>` to point at a different file (e.g. to train several wake
-words side by side - each config's `workspace` directory is independent).
+The recommended way to run everything is the interactive menu:
 
-Every step is safe to re-run: it checks what it's already produced and
-skips finished work.
+```
+python -m trainer.local.cli
+```
+
+(`python3` on WSL/Linux.) It walks through every step below in order -
+setup, preview-word, generate-samples, download-data, preview-augment,
+build-features, train, export - running each one automatically, and only
+stops to ask you something at the points that actually need a human
+decision: listening to a preview and confirming it sounds right, choosing
+whether to retrain over an existing checkpoint, picking a probability
+cutoff after looking at the ROC results, and entering export metadata.
+Everything else just runs straight through. If `trainer/wakeword_config.yaml`
+doesn't exist yet, it offers to create one interactively on first launch.
+From the main menu you can also jump in and re-run starting from any
+individual step (e.g. after editing the config).
+
+Pass `--config <path>` (before or after the subcommand) to point at a
+different config file - e.g. to train several wake words side by side, since
+each config's `workspace` directory is independent.
+
+Every step is also available as its own `python -m trainer.local.cli
+<command>` for scripting a single step directly, documented below. Both
+forms are equivalent - the menu just sequences the same commands and pauses
+in the right places. Every step is safe to re-run either way: it checks
+what it's already produced and skips finished work.
 
 1. **Check the phonetic spelling** by generating one sample and listening to it:
 

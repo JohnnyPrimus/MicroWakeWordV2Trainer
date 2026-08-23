@@ -1,9 +1,15 @@
 """Local microWakeWord training pipeline CLI.
 
 Usage:
-    python -m trainer.local.cli <command> --config trainer/wakeword_config.yaml
+    python -m trainer.local.cli [<command>] --config trainer/wakeword_config.yaml
+
+Running with no command (or `menu`) launches the interactive, menu-driven
+runner: it walks every step below in order and only stops for input at
+points that need a human decision (see trainer/local/menu.py). Individual
+commands remain available for scripting a single step directly.
 
 Commands:
+    menu               Interactive menu-driven runner (default if no command given).
     setup             Clone/install microWakeWord + piper-sample-generator, download the Piper voice checkpoint.
     preview-word       Generate one wake word sample so you can listen to the phonetic spelling.
     generate-samples   Generate the full batch of synthetic wake word samples.
@@ -26,19 +32,21 @@ import sys
 from trainer.local.config import load_config
 
 
-def _add_config_arg(parser: argparse.ArgumentParser) -> None:
+def _add_config_arg(parser: argparse.ArgumentParser, *, suppress_default: bool = False) -> None:
     parser.add_argument(
         "--config",
-        default="trainer/wakeword_config.yaml",
+        default=argparse.SUPPRESS if suppress_default else "trainer/wakeword_config.yaml",
         help="Path to a wakeword_config.yaml (see trainer/wakeword_config.example.yaml)",
     )
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    subparsers = parser.add_subparsers(dest="command", required=True)
+    _add_config_arg(parser)
+    subparsers = parser.add_subparsers(dest="command")
 
     for name, help_text in [
+        ("menu", "Interactive menu-driven runner (default if no command given)"),
         ("setup", "Install/clone dependencies"),
         ("preview-word", "Generate one wake word sample to check the phonetic spelling"),
         ("generate-samples", "Generate the full batch of wake word samples"),
@@ -50,7 +58,7 @@ def main(argv: list[str] | None = None) -> int:
         ("all", "Run download-data, build-features, and train in sequence"),
     ]:
         sub = subparsers.add_parser(name, help=help_text)
-        _add_config_arg(sub)
+        _add_config_arg(sub, suppress_default=True)
         if name == "train":
             sub.add_argument(
                 "--no-train",
@@ -70,6 +78,12 @@ def main(argv: list[str] | None = None) -> int:
             sub.add_argument("--tensor-arena-size", type=int, default=30000)
 
     args = parser.parse_args(argv)
+
+    if args.command is None or args.command == "menu":
+        from trainer.local import menu
+
+        return menu.main(["--config", args.config])
+
     config = load_config(args.config)
 
     if args.command == "setup":
