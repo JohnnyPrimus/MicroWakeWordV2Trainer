@@ -27,6 +27,10 @@ plain Python CLI you run on your own machine instead of in a Colab VM.
   [Troubleshooting](#troubleshooting--why-does-setup-do-all-that) below) that
   the original notebook doesn't have to deal with, since Colab's VM image
   and package versions are fixed at the time the notebook was written.
+- **Menu-driven by default.** `python -m trainer.local.cli` (no arguments)
+  launches an interactive menu that runs every step below in order and only
+  stops to ask you something when a step genuinely needs a human decision -
+  see [Running the pipeline](#running-the-pipeline).
 
 ## Pipeline overview
 
@@ -48,10 +52,11 @@ words can have entirely independent workspaces.
 
 ## Requirements
 
-- Python 3.10+ (developed and tested on 3.11)
+- Python 3.11 (due to microWakeWord dependencies, python version must be either 3.11 or 3.10)
 - `git`
 - ~30-40 GB free disk per workspace (background/negative audio datasets are
-  the bulk of it: Audioset alone is several GB per split)
+  the bulk of it: Audioset alone is several GB per split).
+  - After downloading audio datasets, multiple models can be trained without downloading again
 - An NVIDIA GPU is optional but strongly recommended for training speed -
   see the GPU note below. CPU-only works, just slowly (10,000 training
   steps can take an hour or more on a laptop CPU).
@@ -95,16 +100,16 @@ differs. Pick whichever section matches how you want to run it.
    and `wake_word.friendly_name`. See the comments in
    `trainer\wakeword_config.example.yaml` for what every other field does.
 
-4. Install the rest of the toolchain (microWakeWord, piper-sample-generator,
-   the Piper voice checkpoint):
+4. Launch the interactive menu - it installs the rest of the toolchain
+   (microWakeWord, piper-sample-generator, the Piper voice checkpoint) as its
+   first step, then walks you through the rest of the pipeline. See
+   [Running the pipeline](#running-the-pipeline) below.
 
    ```powershell
-   python -m trainer.local.cli setup
+   python -m trainer.local.cli
    ```
-
-5. Run the pipeline steps in order - see [Running the pipeline](#running-the-pipeline)
-   below. All commands are the same `python -m trainer.local.cli <command>`
-   form shown there.
+   
+   
 
 ---
 
@@ -144,25 +149,16 @@ differs. Pick whichever section matches how you want to run it.
    sudo apt install -y python3 python3-venv python3-pip build-essential git
    ```
 
-5. **Get to the repo.** Either work on your existing Windows checkout via
-   the `/mnt/c/...` path:
-
+5. **Clone the repo.**
+   
    ```bash
-   cd "/mnt/c/Users/<you>/git/MicroWakeWordV2Trainer"
+   git clone https://github.com/JohnnyPrimus/MicroWakeWordV2Trainer.git ~/MicroWakeWordV2Trainer
    ```
-
-   or clone a fresh copy into WSL's native filesystem for better I/O
-   performance (matters most for the download-data step, which writes
-   tens of thousands of small files):
-
-   ```bash
-   git clone <repo-url> ~/MicroWakeWordV2Trainer
-   cd ~/MicroWakeWordV2Trainer
-   ```
-
+   
 6. **Set up the Python environment:**
 
    ```bash
+   cd ~/MicroWakeWordV2Trainer
    python3 -m venv .venv
    source .venv/bin/activate
    pip install -r trainer/requirements.txt
@@ -174,7 +170,7 @@ differs. Pick whichever section matches how you want to run it.
    cp trainer/wakeword_config.example.yaml trainer/wakeword_config.yaml
    ```
 
-   Edit it - at minimum `wake_word.phonetic` and `wake_word.friendly_name`.
+   Edit wakeword_config.yaml - at minimum `wake_word.phonetic` and `wake_word.friendly_name`.
 
 8. **Run setup**, then explicitly install the CUDA-enabled TensorFlow
    extras (microWakeWord's own dependency list just says `tensorflow`,
@@ -185,21 +181,19 @@ differs. Pick whichever section matches how you want to run it.
    pip install "tensorflow[and-cuda]"
    ```
 
-9. **Verify TensorFlow sees the GPU:**
+9. **Verify TensorFlow sees the CPU:**
 
    ```bash
-   python3 -c "import tensorflow as tf; print(tf.config.list_physical_devices('GPU'))"
+   python3 -c "import tensorflow as tf; print(tf.reduce_sum(tf.random.normal([1000, 1000])))"
    ```
 
-   You should see a `PhysicalDevice` entry with `device_type='GPU'`. If the
-   list is empty, re-check steps 2-3 and step 8's `tensorflow[and-cuda]`
-   install.
+   You should see a no error and a tensor shown at the end of the output. 
 
-10. Run the pipeline steps in order - see below. Commands are `python3 -m
-    trainer.local.cli <command>` inside WSL (same as Windows, just `python3`
-    instead of `python`).
+10. Launch the interactive menu for the rest of the pipeline - see
+    [Running the pipeline](#running-the-pipeline) below. Its first step re-runs `setup`, which is safe here too - it
+    won't touch the CUDA-enabled TensorFlow you just installed in step 8.
 
-If your GPU has limited VRAM (e.g. a laptop GPU with 6-8 GB), and training
+If you're using a GPU with limited VRAM (e.g. a laptop GPU with 6-8 GB), and training
 fails with an out-of-memory error, lower `training.batch_size` in the
 config (default 128).
 
@@ -207,12 +201,38 @@ config (default 128).
 
 ## Running the pipeline
 
-All commands default to `--config trainer/wakeword_config.yaml`; pass
-`--config <path>` to point at a different file (e.g. to train several wake
-words side by side - each config's `workspace` directory is independent).
+The recommended way to run everything is the interactive menu:
 
-Every step is safe to re-run: it checks what it's already produced and
-skips finished work.
+```
+python3 -m trainer.local.cli
+```
+
+(On Windows: **`python`** rather than python3.) 
+
+It walks through every step below in order -
+setup, preview-word, generate-samples, download-data, preview-augment,
+build-features, train, export - running each one automatically, and only
+stops to ask you something at the points that actually need a human
+decision: listening to a preview and confirming it sounds right, choosing
+whether to retrain over an existing checkpoint, picking a probability
+cutoff after looking at the ROC results, and entering export metadata.
+Everything else just runs straight through. If `trainer/wakeword_config.yaml`
+doesn't exist yet, it offers to create one interactively on first launch.
+From the main menu you can also jump in and re-run starting from any
+individual step (e.g. after editing the config).
+
+Pass `--config <path>` (before or after the subcommand) to point at a
+different config file - e.g. to train several wake words side by side, since
+each config's `workspace` directory is independent.
+
+
+
+## Scripting the pipeline or running individual steps
+
+Every step is also available as its own `python -m trainer.local.cli
+<command>` for scripting a single step directly, documented below. Both
+forms are equivalent - the menu just makes things easier. Every step is safe to re-run either way: it checks
+what it's already produced and skips finished work.
 
 1. **Check the phonetic spelling** by generating one sample and listening to it:
 
