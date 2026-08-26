@@ -1,6 +1,7 @@
 # Local microWakeWord V2 Trainer
 
-A local, script-driven alternative to `trainer/microwakeword_trainer_colab.ipynb`.
+A local, script-driven alternative to `trainer/microwakeword_trainer_colab.ipynb` 
+that anyone can run.
 It runs the same underlying pipeline as the Colab notebook — synthesize wake
 word audio with Piper TTS, augment it with background noise and room
 impulse responses, turn that into spectrogram features, and train a
