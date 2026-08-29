@@ -151,8 +151,8 @@ differs. Pick whichever section matches how you want to run it.
    sudo apt install -y python3 python3-venv python3-pip build-essential git
    ```
 
-   Remember this needs to be python 3.11. Use the Deadsnakes repo if you want to install 3.11 side by side with 3.14 on modern Ubuntu/Debian.
-   Alternatively, install pyenv, pyenv-virtualenv and use pyenv to install 3.11.
+   *Remember this needs to be python 3.11. Use the Deadsnakes repo if you want to install 3.11 side by side with 3.14 on modern Ubuntu/Debian.
+   Alternatively, install pyenv, pyenv-virtualenv and use pyenv to install 3.11*.
 
 5. **Clone the repo.**
    
