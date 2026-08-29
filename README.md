@@ -154,13 +154,13 @@ differs. Pick whichever section matches how you want to run it.
    Remember this needs to be python 3.11. Use the Deadsnakes repo if you want to install 3.11 side by side with 3.14 on modern Ubuntu/Debian.
    Alternatively, install pyenv, pyenv-virtualenv and use pyenv to install 3.11.
 
-6. **Clone the repo.**
+5. **Clone the repo.**
    
    ```bash
    git clone https://github.com/JohnnyPrimus/MicroWakeWordV2Trainer.git ~/MicroWakeWordV2Trainer
    ```
    
-7. Option 1) **Set up the Python environment (native Python install):**
+6. Option 1) **Set up the Python environment (native Python install):**
 
    ```bash
    cd ~/MicroWakeWordV2Trainer
@@ -176,7 +176,7 @@ differs. Pick whichever section matches how you want to run it.
    pip install -r trainer/requirements.txt
    ```
 
-9. **Create your wake word config** (same as the Windows instructions):
+7. **Create your wake word config** (same as the Windows instructions):
 
    ```bash
    cp trainer/wakeword_config.example.yaml trainer/wakeword_config.yaml
@@ -184,7 +184,7 @@ differs. Pick whichever section matches how you want to run it.
 
    Edit wakeword_config.yaml - at minimum `wake_word.phonetic` and `wake_word.friendly_name`.
 
-10. **Run setup**, then explicitly install the CUDA-enabled TensorFlow
+8. **Run setup**, then explicitly install the CUDA-enabled TensorFlow
    extras (microWakeWord's own dependency list just says `tensorflow`,
    which alone doesn't pull in the CUDA/cuDNN wheels):
 
@@ -193,7 +193,7 @@ differs. Pick whichever section matches how you want to run it.
    pip install "tensorflow[and-cuda]"
    ```
 
-11. **Verify TensorFlow sees the CPU:**
+9. **Verify TensorFlow sees the CPU:**
 
    ```bash
    python3 -c "import tensorflow as tf; print(tf.reduce_sum(tf.random.normal([1000, 1000])))"
@@ -201,7 +201,7 @@ differs. Pick whichever section matches how you want to run it.
 
    You should see a no error and a tensor shown at the end of the output. 
 
-11. Launch the interactive menu for the rest of the pipeline - see
+10. Launch the interactive menu for the rest of the pipeline - see
     [Running the pipeline](#running-the-pipeline) below. Its first step re-runs `setup`, which is safe here too - it
     won't touch the CUDA-enabled TensorFlow you just installed in step 8.
 
