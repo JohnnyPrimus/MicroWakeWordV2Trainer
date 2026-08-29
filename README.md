@@ -8,6 +8,18 @@ impulse responses, turn that into spectrogram features, and train a
 [microWakeWord](https://github.com/kahrendt/microWakeWord) model — as a
 plain Python CLI you run on your own machine instead of in a Colab VM.
 
+## Requirements
+
+- Python 3.11 (due to microWakeWord dependencies, python version must be either 3.11 or 3.10)
+  - Later distributions of Ubuntu/Debian (26.04, Trixie) ship with Python 3.14. Either Deadsnakes PPA or pyenv will allow easy side by side installations of 3.14 and 3.11. Personal recommendation is pyenv. Either way you'll be using a .venv to handle dependencies, but I find pyenv I bit more straight forward by configuring py version on a folder/project level.   
+- `git`
+- ~30-40 GB free disk per workspace (background/negative audio datasets are
+  the bulk of it: Audioset alone is several GB per split).
+  - After downloading audio datasets, multiple models can be trained without downloading again using the same workspace.
+- An NVIDIA GPU is optional but strongly recommended for training speed -
+  see the GPU note below. CPU-only works, just slowly (10,000 training
+  steps can take an hour or more on a laptop CPU).
+
 ## What it does differently from the baseline notebook
 
 - **Fixes a missing step.** The notebook's training-config cell references a
@@ -50,17 +62,6 @@ Everything a run produces - cloned repos, downloaded datasets, generated
 samples, feature mmaps, trained checkpoints, and the final exported model -
 lives under one `workspace/` directory (configurable), so different wake
 words can have entirely independent workspaces.
-
-## Requirements
-
-- Python 3.11 (due to microWakeWord dependencies, python version must be either 3.11 or 3.10)
-- `git`
-- ~30-40 GB free disk per workspace (background/negative audio datasets are
-  the bulk of it: Audioset alone is several GB per split).
-  - After downloading audio datasets, multiple models can be trained without downloading again
-- An NVIDIA GPU is optional but strongly recommended for training speed -
-  see the GPU note below. CPU-only works, just slowly (10,000 training
-  steps can take an hour or more on a laptop CPU).
 
 ### GPU note (Windows)
 
