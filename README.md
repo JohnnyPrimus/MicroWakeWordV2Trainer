@@ -18,7 +18,7 @@ plain Python CLI you run on your own machine instead of in a Colab VM.
   - After downloading audio datasets, multiple models can be trained without downloading again using the same workspace.
 - An NVIDIA GPU is optional but strongly recommended for training speed -
   see the GPU note below. CPU-only works, just slowly (10,000 training
-  steps can take an hour or more on a laptop CPU).
+  steps can take an hour or more on a laptop CPU). A GPU can be used both via WSL and in native Linux, but *not* using native Windows (Windows is CPU only)
 
 ## What it does differently from the baseline notebook
 
