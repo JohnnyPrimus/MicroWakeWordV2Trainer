@@ -147,14 +147,14 @@ are identical to WSL, save for driver installation
 
 ## Nvidia Driver Install, do only one of the below ##
 
-2.1 **WSL2: Install an NVIDIA driver on the Windows side only.** Download the
+2. **WSL2: Install an NVIDIA driver on the Windows side only.** Download the
    latest driver from
    [nvidia.com](https://www.nvidia.com/Download/index.aspx) and install it
    normally on Windows. Do **not** install a separate NVIDIA Linux driver
    inside WSL - WSL2 shares the Windows host's driver via GPU passthrough,
    and installing one inside Ubuntu will break it.
 
-2.2 **Native Ubuntu: Install NVIDIA and CUDA drivers .** 
+2. OR: **Native Ubuntu: Install NVIDIA and CUDA drivers .** 
 
    To install Nvidia drivers on Ubuntu, start by installing the Ubuntu proprietary driver installer:
 
