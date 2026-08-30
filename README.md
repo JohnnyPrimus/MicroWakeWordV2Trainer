@@ -20,7 +20,21 @@ plain Python CLI you run on your own machine instead of in a Colab VM.
   see the GPU note below. CPU-only works, just slowly (10,000 training
   steps can take an hour or more on a laptop CPU). A GPU can be used both via WSL and in native Linux, but *not* using native Windows (Windows is CPU only)
 
-## What it does differently from the baseline notebook
+## How long does training take
+
+- **Native Windows, via Surface Laptop Studio 2 CPU only** Using CPU only on Windows or WSL,
+  a training run (downloading all audio and training) takes about 70-80 minutes. About
+  half of that is downloading audio, which is only required once. So multiple models
+  takes ~40 minutes each.
+- **WSL2, via Surface Laptop Studio 2 with Nvidia 4050 GPU** I do not yet have the 4050 working with WSL
+  on the Surface Laptop. I'll update benchmark once I do but I'd expect a substantially
+  faster training time. Probably less than 15 minutes per model.
+- **Native Ubuntu 26.04, via AMD 9950X and a 2080TI** Using native Linux with Nvidia drivers version 595
+  takes about 30-40 minutes, including download times. After audio download, models can be produced in
+  about 5 minutes each.
+
+
+## What this does differently from the baseline notebook
 
 - **Fixes a missing step.** The notebook's training-config cell references a
   `generated_features_output_dir` variable that's never defined anywhere -
@@ -73,9 +87,12 @@ microWakeWord requires `tensorflow>=2.18`. That means:
 - **WSL2** (Windows Subsystem for Linux): TensorFlow can use an NVIDIA GPU
   normally, via the same driver passthrough any other WSL2 CUDA workload
   uses.
-
-The commands below are identical on both; only the initial environment setup
-differs. Pick whichever section matches how you want to run it.
+- **Native Linux** (Tested Ubuntu 26.04): Provided that both Nvidia drivers and CUDA
+  drivers are installed prior to installing TensorFlow with CUDA, GPU should work fine.
+   
+The commands below are the same for Windows and WSL; only the initial environment setup
+differs. Pick whichever section matches how you want to run it. The commands for Native Linux
+are identical to WSL, save for driver installation
 
 ---
 
@@ -115,26 +132,37 @@ differs. Pick whichever section matches how you want to run it.
 
 ---
 
-## Setup & run — WSL2 (recommended for GPU training)
+## Setup & run — WSL2 and Native Linux (recommended for GPU training)
 
-1. **Install WSL2 with Ubuntu**, if you haven't already. From an elevated
-   PowerShell prompt:
+1. **Either Install WSL2 with Ubuntu, or install Ubuntu directly**
+
+   To install Ubuntu for WSL2 for Windows, from a PowerShell prompt:
 
    ```powershell
    wsl --install -d Ubuntu
    ```
 
-   Reboot if prompted, then open the Ubuntu app once to finish first-time
+   Reboot if prompted, then open an Ubuntu WSL terminal once to finish first-time
    setup (creates your Linux user account).
 
-2. **Install an NVIDIA driver on the Windows side only.** Download the
+3.1 **WSL2: Install an NVIDIA driver on the Windows side only.** Download the
    latest driver from
    [nvidia.com](https://www.nvidia.com/Download/index.aspx) and install it
    normally on Windows. Do **not** install a separate NVIDIA Linux driver
    inside WSL - WSL2 shares the Windows host's driver via GPU passthrough,
    and installing one inside Ubuntu will break it.
 
-3. **Verify the GPU is visible inside WSL:**
+3.2 **Native Ubuntu: Install NVIDIA and CUDA drivers .** 
+
+   To install Nvidia drivers on Ubuntu, start by installing the Ubuntu proprietary driver installer:
+
+    ```bash
+   sudo apt-get install ubuntu-drivers-common
+   ```
+
+  
+
+4. **Verify the GPU is visible inside WSL:**
 
    ```bash
    nvidia-smi
@@ -144,7 +172,7 @@ differs. Pick whichever section matches how you want to run it.
    extra setup. If it fails, the Windows-side driver install above is the
    thing to fix first.
 
-4. **Install build tools and Python 3.11** inside Ubuntu (WSL):
+5. **Install build tools and Python 3.11** inside Ubuntu (WSL):
 
    ```bash
    sudo apt update
@@ -154,13 +182,13 @@ differs. Pick whichever section matches how you want to run it.
    *Remember this needs to be python 3.11. Use the Deadsnakes repo if you want to install 3.11 side by side with 3.14 on modern Ubuntu/Debian.
    Alternatively, install pyenv, pyenv-virtualenv and use pyenv to install 3.11*.
 
-5. **Clone the repo.**
+6. **Clone the repo.**
    
    ```bash
    git clone https://github.com/JohnnyPrimus/MicroWakeWordV2Trainer.git ~/MicroWakeWordV2Trainer
    ```
    
-6. Option 1) **Set up the Python environment (native Python install):**
+7. Option 1) **Set up the Python environment (native Python install):**
 
    ```bash
    cd ~/MicroWakeWordV2Trainer
@@ -176,7 +204,7 @@ differs. Pick whichever section matches how you want to run it.
    pip install -r trainer/requirements.txt
    ```
 
-7. **Create your wake word config** (same as the Windows instructions):
+8. **Create your wake word config** (same as the Windows instructions):
 
    ```bash
    cp trainer/wakeword_config.example.yaml trainer/wakeword_config.yaml
@@ -184,7 +212,7 @@ differs. Pick whichever section matches how you want to run it.
 
    Edit wakeword_config.yaml - at minimum `wake_word.phonetic` and `wake_word.friendly_name`.
 
-8. **Run setup**, then explicitly install the CUDA-enabled TensorFlow
+9. **Run setup**, then explicitly install the CUDA-enabled TensorFlow
    extras (microWakeWord's own dependency list just says `tensorflow`,
    which alone doesn't pull in the CUDA/cuDNN wheels):
 
@@ -193,7 +221,7 @@ differs. Pick whichever section matches how you want to run it.
    pip install "tensorflow[and-cuda]"
    ```
 
-9. **Verify TensorFlow sees the CPU:**
+10. **Verify TensorFlow sees the CPU:**
 
    ```bash
    python3 -c "import tensorflow as tf; print(tf.reduce_sum(tf.random.normal([1000, 1000])))"
