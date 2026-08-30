@@ -11,7 +11,7 @@ plain Python CLI you run on your own machine instead of in a Colab VM.
 ## Requirements
 
 - Python 3.11 (due to microWakeWord dependencies, python version must be either 3.11 or 3.10)
-  - Later distributions of Ubuntu/Debian (26.04, Trixie) ship with Python 3.14. Either Deadsnakes PPA or pyenv will allow easy side by side installations of 3.14 and 3.11. Personal recommendation is pyenv. Either way you'll be using a .venv to handle dependencies, but I find pyenv I bit more straight forward by configuring py version on a folder/project level.   
+  - Later distributions of Ubuntu/Debian (26.04, Trixie) ship with Python 3.14. Either Deadsnakes PPA or pyenv will allow easy side by side installations of 3.14 and 3.11. Personal recommendation is pyenv. Either way you'll be using a virtual environment to handle dependencies, but I find pyenv a bit more straight forward by simply configuring py version on a folder/project level and proceeding without needing to actually activate a .venv.   
 - `git`
 - ~30-40 GB free disk per workspace (background/negative audio datasets are
   the bulk of it: Audioset alone is several GB per split).
