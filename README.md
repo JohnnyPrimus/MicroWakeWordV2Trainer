@@ -210,7 +210,7 @@ are identical to WSL, save for driver installation
    
    Alternatively, and my personal recommendation, is to install pyenv and pyenv-virtualenv, and use pyenv to install 3.11*.
 
-   An AI overview of installing Python 3.11 on Ubuntu 26.04 using PyEnv [#https://www.google.com/search?q=install+python+3.11+ubuntu+26.04+pyenv](can be found here)
+   An AI overview of installing Python 3.11 on Ubuntu 26.04 using PyEnv [#can be found here](https://www.google.com/search?q=install+python+3.11+ubuntu+26.04+pyenv)
 
    For older versions of Ubuntu (22.04, 24.04?), you can install via apt:
    
