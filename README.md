@@ -199,7 +199,25 @@ differs. Pick whichever section matches how you want to run it.
    python3 -c "import tensorflow as tf; print(tf.reduce_sum(tf.random.normal([1000, 1000])))"
    ```
 
-   You should see a no error and a tensor shown at the end of the output. 
+   You should see a no error and a tensor shown at the end of the output. (See below)
+   <img width="1417" height="392" alt="image" src="https://github.com/user-attachments/assets/cd6d92f2-f38c-4a73-8702-af20fec2dbb0" />
+
+
+9.1 **Optional: Verify TensorFlow sees the GPU:**
+
+   If you either have GPU passthrough via WSL working, or have installed both the Nvidia and CUDA drivers, check to
+   ensure TensorFlow can see the GPU
+
+   ```bash
+   python3 -c "import tensorflow as tf; print(tf.config.list_physical_devices('GPU'))"
+   ```
+
+   You should see a `PhysicalDevice` entry with `device_type='GPU'`. If the
+   list is empty, re-check steps 2-3 and step 8's `tensorflow[and-cuda]`
+   install. (See below)
+   <img width="1442" height="376" alt="tensorflow_detect_GPU" src="https://github.com/user-attachments/assets/eac4be03-b198-4fde-8710-26e66e694097" />
+
+
 
 10. Launch the interactive menu for the rest of the pipeline - see
     [Running the pipeline](#running-the-pipeline) below. Its first step re-runs `setup`, which is safe here too - it
