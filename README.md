@@ -156,39 +156,75 @@ are identical to WSL, save for driver installation
 
    To install Nvidia drivers on Ubuntu, start by installing the Ubuntu proprietary driver installer:
 
-    ```bash
+   ```bash
    sudo apt-get install ubuntu-drivers-common
    ```
 
-  
+   Verify that an Nvidia GPU is installed in the system
 
-4. **Verify the GPU is visible inside WSL:**
+   ```bash
+   ubuntu-drivers devices
+   ```
+
+   You should see an output of drivers compatible with the system, along with the compatible device itself (see below. I selected the 595 drivers for training)
+  <img width="667" height="480" alt="image" src="https://github.com/user-attachments/assets/422ca162-3457-4bdd-a772-d7873eee00d3" />
+
+   Install one of the compatible drivers via ubuntu-drivers (I chose 595)
+
+   ```bash
+   sudo ubuntu-drivers install nvidia-driver-595
+   ```
+
+   Reboot after Nvidia driver install
+
+   ```bash
+   sudo reboot
+   ```
+
+   Install CUDA toolkit after reboot
+
+   ```bash
+   sudo apt install nvidia-cuda-toolkit -y
+   ```
+
+4. **Verify the GPU and CUDA is visible inside Linux/WSL:**
 
    ```bash
    nvidia-smi
    ```
 
-   This should print your GPU, driver version, and CUDA version without any
-   extra setup. If it fails, the Windows-side driver install above is the
-   thing to fix first.
+   Make sure this prints your **GPU**, **Nvidia driver version**, and **CUDA toolkit version** version. (See below)
+   If it fails, or fails to print CUDA version, reinstall as necessary
+   <img width="752" height="711" alt="image" src="https://github.com/user-attachments/assets/ac75fe9f-5c93-48a7-bd24-278d8137d18e" />
 
-5. **Install build tools and Python 3.11** inside Ubuntu (WSL):
 
+
+6. **Install build tools and Python 3.11** inside Ubuntu (WSL and Native Ubuntu):
+
+   *Remember this needs to be python 3.11. The below will work with older versions of Ubuntu or Debian,
+   but for newer versions that ship with 3.12+, make sure to use the DeadSnakes repo for Ubuntu to install 3.11
+   side by side with the modern Ubuntu/Debian version.
+   
+   Alternatively, and my personal recommendation, is to install pyenv and pyenv-virtualenv, and use pyenv to install 3.11*.
+
+   An AI overview of installing Python 3.11 on Ubuntu 26.04 using PyEnv [https://www.google.com/search?q=install+python+3.11+ubuntu+26.04+pyenv](can be found here)
+
+   For older versions of Ubuntu (22.04, 24.04?), you can install via apt:
+   
    ```bash
    sudo apt update
    sudo apt install -y python3 python3-venv python3-pip build-essential git
    ```
 
-   *Remember this needs to be python 3.11. Use the Deadsnakes repo if you want to install 3.11 side by side with 3.14 on modern Ubuntu/Debian.
-   Alternatively, install pyenv, pyenv-virtualenv and use pyenv to install 3.11*.
+   
 
-6. **Clone the repo.**
+7. **Clone the repo.**
    
    ```bash
    git clone https://github.com/JohnnyPrimus/MicroWakeWordV2Trainer.git ~/MicroWakeWordV2Trainer
    ```
    
-7. Option 1) **Set up the Python environment (native Python install):**
+8. Option 1) **Set up the Python environment (native Python install):**
 
    ```bash
    cd ~/MicroWakeWordV2Trainer
@@ -204,7 +240,7 @@ are identical to WSL, save for driver installation
    pip install -r trainer/requirements.txt
    ```
 
-8. **Create your wake word config** (same as the Windows instructions):
+9. **Create your wake word config** (same as the Windows instructions):
 
    ```bash
    cp trainer/wakeword_config.example.yaml trainer/wakeword_config.yaml
@@ -212,7 +248,7 @@ are identical to WSL, save for driver installation
 
    Edit wakeword_config.yaml - at minimum `wake_word.phonetic` and `wake_word.friendly_name`.
 
-9. **Run setup**, then explicitly install the CUDA-enabled TensorFlow
+10. **Run setup**, then explicitly install the CUDA-enabled TensorFlow
    extras (microWakeWord's own dependency list just says `tensorflow`,
    which alone doesn't pull in the CUDA/cuDNN wheels):
 
@@ -221,7 +257,7 @@ are identical to WSL, save for driver installation
    pip install "tensorflow[and-cuda]"
    ```
 
-10. **Verify TensorFlow sees the CPU:**
+11. **Verify TensorFlow sees the CPU:**
 
    ```bash
    python3 -c "import tensorflow as tf; print(tf.reduce_sum(tf.random.normal([1000, 1000])))"
