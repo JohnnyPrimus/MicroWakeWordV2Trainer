@@ -145,6 +145,8 @@ are identical to WSL, save for driver installation
    Reboot if prompted, then open an Ubuntu WSL terminal once to finish first-time
    setup (creates your Linux user account).
 
+## Nvidia Driver Install, do only one of the below ##
+
 2.1 **WSL2: Install an NVIDIA driver on the Windows side only.** Download the
    latest driver from
    [nvidia.com](https://www.nvidia.com/Download/index.aspx) and install it
