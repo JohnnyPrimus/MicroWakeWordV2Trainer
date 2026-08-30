@@ -189,7 +189,7 @@ are identical to WSL, save for driver installation
    sudo apt install nvidia-cuda-toolkit -y
    ```
 
-3. **Verify the GPU and CUDA is visible inside Linux/WSL:**
+   **Verify the GPU and CUDA is visible inside Linux/WSL:**
 
    ```bash
    nvidia-smi
