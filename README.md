@@ -242,8 +242,8 @@ python3 -m trainer.local.cli
 It walks through every step below in order -
 setup, preview-word, generate-samples, download-data, preview-augment,
 build-features, train, export - running each one automatically, and only
-stops to ask you something at the points that actually need a human
-decision: listening to a preview and confirming it sounds right, choosing
+stops at points that decisions are optional or required, for example listening to a 
+preview and confirming it sounds right (see sample_models directory for examples), choosing
 whether to retrain over an existing checkpoint, picking a probability
 cutoff after looking at the ROC results, and entering export metadata.
 Everything else just runs straight through. If `trainer/wakeword_config.yaml`
