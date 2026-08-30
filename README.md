@@ -145,14 +145,14 @@ are identical to WSL, save for driver installation
    Reboot if prompted, then open an Ubuntu WSL terminal once to finish first-time
    setup (creates your Linux user account).
 
-3.1 **WSL2: Install an NVIDIA driver on the Windows side only.** Download the
+2.1 **WSL2: Install an NVIDIA driver on the Windows side only.** Download the
    latest driver from
    [nvidia.com](https://www.nvidia.com/Download/index.aspx) and install it
    normally on Windows. Do **not** install a separate NVIDIA Linux driver
    inside WSL - WSL2 shares the Windows host's driver via GPU passthrough,
    and installing one inside Ubuntu will break it.
 
-3.2 **Native Ubuntu: Install NVIDIA and CUDA drivers .** 
+2.2 **Native Ubuntu: Install NVIDIA and CUDA drivers .** 
 
    To install Nvidia drivers on Ubuntu, start by installing the Ubuntu proprietary driver installer:
 
@@ -187,7 +187,7 @@ are identical to WSL, save for driver installation
    sudo apt install nvidia-cuda-toolkit -y
    ```
 
-4. **Verify the GPU and CUDA is visible inside Linux/WSL:**
+3. **Verify the GPU and CUDA is visible inside Linux/WSL:**
 
    ```bash
    nvidia-smi
@@ -195,11 +195,12 @@ are identical to WSL, save for driver installation
 
    Make sure this prints your **GPU**, **Nvidia driver version**, and **CUDA toolkit version** version. (See below)
    If it fails, or fails to print CUDA version, reinstall as necessary
+   
    <img width="752" height="711" alt="image" src="https://github.com/user-attachments/assets/ac75fe9f-5c93-48a7-bd24-278d8137d18e" />
 
 
 
-6. **Install build tools and Python 3.11** inside Ubuntu (WSL and Native Ubuntu):
+4. **Install build tools and Python 3.11** inside Ubuntu (WSL and Native Ubuntu):
 
    *Remember this needs to be python 3.11. The below will work with older versions of Ubuntu or Debian,
    but for newer versions that ship with 3.12+, make sure to use the DeadSnakes repo for Ubuntu to install 3.11
@@ -218,13 +219,13 @@ are identical to WSL, save for driver installation
 
    
 
-7. **Clone the repo.**
+5. **Clone the repo.**
    
    ```bash
    git clone https://github.com/JohnnyPrimus/MicroWakeWordV2Trainer.git ~/MicroWakeWordV2Trainer
    ```
    
-8. Option 1) **Set up the Python environment (native Python install):**
+6. Option 1) **Set up the Python environment (native Python install):**
 
    ```bash
    cd ~/MicroWakeWordV2Trainer
@@ -240,7 +241,7 @@ are identical to WSL, save for driver installation
    pip install -r trainer/requirements.txt
    ```
 
-9. **Create your wake word config** (same as the Windows instructions):
+7. **Create your wake word config** (same as the Windows instructions):
 
    ```bash
    cp trainer/wakeword_config.example.yaml trainer/wakeword_config.yaml
@@ -248,7 +249,7 @@ are identical to WSL, save for driver installation
 
    Edit wakeword_config.yaml - at minimum `wake_word.phonetic` and `wake_word.friendly_name`.
 
-10. **Run setup**, then explicitly install the CUDA-enabled TensorFlow
+8. **Run setup**, then explicitly install the CUDA-enabled TensorFlow
    extras (microWakeWord's own dependency list just says `tensorflow`,
    which alone doesn't pull in the CUDA/cuDNN wheels):
 
@@ -257,7 +258,7 @@ are identical to WSL, save for driver installation
    pip install "tensorflow[and-cuda]"
    ```
 
-11. **Verify TensorFlow sees the CPU:**
+9. **Verify TensorFlow sees the CPU:**
 
    ```bash
    python3 -c "import tensorflow as tf; print(tf.reduce_sum(tf.random.normal([1000, 1000])))"
