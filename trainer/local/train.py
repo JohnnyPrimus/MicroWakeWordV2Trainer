@@ -134,4 +134,6 @@ def run(config: TrainerConfig, train: bool = True) -> None:
     ]
 
     print(f"$ {' '.join(cmd)}")
-    subprocess.run(cmd, check=True, cwd=str(config.workspace))
+    from trainer.local.setup_env import gpu_env
+
+    subprocess.run(cmd, check=True, cwd=str(config.workspace), env=gpu_env(config.gpu))
