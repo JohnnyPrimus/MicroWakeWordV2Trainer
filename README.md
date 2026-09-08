@@ -16,9 +16,11 @@ plain Python CLI you run on your own machine instead of in a Colab VM.
 - ~30-40 GB free disk per workspace (background/negative audio datasets are
   the bulk of it: Audioset alone is several GB per split).
   - After downloading audio datasets, multiple models can be trained without downloading again using the same workspace.
-- An NVIDIA GPU is optional but strongly recommended for training speed -
-  see the GPU note below. CPU-only works, just slowly (10,000 training
-  steps can take an hour or more on a laptop CPU). A GPU can be used both via WSL and in native Linux, but *not* using native Windows (Windows is CPU only)
+- An NVIDIA or AMD GPU is optional but strongly recommended for training speed -
+  see the GPU notes below. CPU-only works, just slowly (10,000 training
+  steps can take an hour or more on a laptop CPU). A GPU can be used both via WSL and in native Linux, but *not* using native Windows (Windows is CPU only).
+  AMD GPUs train via **ROCm** on native Linux only - see
+  [GPU note (AMD / ROCm)](#gpu-note-amd--rocm).
 
 ## How long does training take
 
@@ -93,6 +95,38 @@ microWakeWord requires `tensorflow>=2.18`. That means:
 The commands below are the same for Windows and WSL; only the initial environment setup
 differs. Pick whichever section matches how you want to run it. The commands for Native Linux
 are identical to WSL, save for driver installation
+
+### GPU note (AMD / ROCm)
+
+AMD GPUs can accelerate training on **native Linux** via
+[ROCm](https://rocm.docs.amd.com), using AMD's own
+[`tensorflow-rocm`](https://repo.radeon.com/rocm/manylinux/) wheels (there
+is no ROCm support on Windows, and no WSL GPU passthrough for AMD here).
+
+How it differs from the NVIDIA path:
+
+- **Python version**: AMD publishes `tensorflow-rocm` wheels only for
+  **Python 3.10 and 3.12** - so the README's "use 3.11" advice doesn't
+  apply; create the venv with 3.10 or 3.12 instead (easiest with
+  [`uv`](https://docs.astral.sh/uv/): `uv venv --python 3.12 .venv`).
+- **Driver/ROCm install**: you need the `amdgpu` kernel driver plus the ROCm
+  userspace stack installed first (see the AMD install guide for your distro;
+  Ubuntu: `amdgpu-install --usecase=rocm`). Verify with `rocminfo` - it must
+  list your GPU and your user needs access to `/dev/kfd` (usually via the
+  `video`/`render` groups).
+- **TensorFlow install**: instead of `pip install "tensorflow[and-cuda]"`,
+  set `gpu.backend: "rocm"` in the config (or run
+  `python -m trainer.local.cli setup --backend rocm`) and the `setup` step
+  installs the ROCm TensorFlow wheel for you from AMD's index, matching your
+  ROCm version via `gpu.rocm_release` / `gpu.tensorflow_rocm_version` (pairing
+  table: [ROCm TensorFlow compatibility](https://rocm.docs.amd.com/projects/install-on-linux/en/latest/compatibility/ml-compatibility/tensorflow-compatibility.html)).
+- **RDNA 3.5 APUs** (gfx1150 "Strix" / gfx1151 "Strix Halo"): AMD's TF wheels
+  don't include kernels for these yet, so also set
+  `gpu.hsa_override_gfx_version: "11.0.0"` (the trainer exports
+  `HSA_OVERRIDE_GFX_VERSION` for setup/training automatically).
+
+See [Setup & run — AMD GPU (ROCm, Linux)](#setup--run--amd-gpu-rocm-linux)
+for the full walkthrough.
 
 ---
 
@@ -251,13 +285,13 @@ are identical to WSL, save for driver installation
 
    Edit wakeword_config.yaml - at minimum `wake_word.phonetic` and `wake_word.friendly_name`.
 
-8. **Run setup**, then explicitly install the CUDA-enabled TensorFlow
+8. **Run setup.** With `gpu.backend: "cuda"` in your config (or
+   `setup --backend cuda`), setup also installs the CUDA-enabled TensorFlow
    extras (microWakeWord's own dependency list just says `tensorflow`,
    which alone doesn't pull in the CUDA/cuDNN wheels):
 
    ```bash
-   python3 -m trainer.local.cli setup
-   pip install "tensorflow[and-cuda]"
+   python3 -m trainer.local.cli setup --backend cuda
    ```
 
 9. **Verify TensorFlow sees the CPU:**
@@ -293,6 +327,98 @@ are identical to WSL, save for driver installation
 If you're using a GPU with limited VRAM (e.g. a laptop GPU with 6-8 GB), and training
 fails with an out-of-memory error, lower `training.batch_size` in the
 config (default 128).
+
+---
+
+## Setup & run — AMD GPU (ROCm, Linux)
+
+1. **Install the amdgpu driver + ROCm**, per the
+   [ROCm installation guide](https://rocm.docs.amd.com/projects/install-on-linux/en/latest/)
+   for your distro (Ubuntu/Debian: `amdgpu-install --usecase=rocm`, then reboot).
+
+   The `tensorflow-rocm` wheel is not fully self-contained: it needs the ROCm
+   runtime libraries (`libamdhip64`, rocBLAS/MIOpen, etc.) installed on the
+   system. On Ubuntu the `--usecase=rocm` install covers this; on Arch the
+   equivalent is `sudo pacman -S rocm-smi-lib rocm-hip-libraries miopen-hip`
+   (plus `base-devel` to build one small sdist during setup).
+
+   Verify (your user must be able to open `/dev/kfd` - add it to the `video`
+   and `render` groups and re-login if `rocminfo` fails):
+
+   ```bash
+   rocminfo | grep -i "Name:"      # should list your GPU, e.g. gfx1151
+   cat /opt/rocm/.info/version     # your ROCm version, e.g. 7.2.4
+   ```
+
+2. **Create a Python 3.10 or 3.12 venv** (AMD's tensorflow-rocm wheels only
+   exist for these two versions - *not* 3.11):
+
+   ```bash
+   cd MicroWakeWordV2Trainer
+   uv venv --python 3.12 .venv     # or: python3.12 -m venv .venv
+   source .venv/bin/activate
+   pip install -r trainer/requirements.txt
+   ```
+
+3. **Create your config** and set the `gpu` section:
+
+   ```bash
+   cp trainer/wakeword_config.example.yaml trainer/wakeword_config.yaml
+   ```
+
+   ```yaml
+   gpu:
+     backend: "rocm"
+     rocm_release: "7.2"           # must match `cat /opt/rocm/.info/version` major.minor
+     tensorflow_rocm_version: "2.19.1"   # must be published for that release (see pairing table above)
+     hsa_override_gfx_version: "11.0.0"  # REQUIRED on RDNA 3.5 APUs (gfx1150 "Strix" /
+                                          # gfx1151 "Strix Halo"); leave "" on other AMD GPUs
+   ```
+
+   Without the `hsa_override_gfx_version` on gfx1150/gfx1151, TensorFlow
+   aborts with a `hip_code_object.cpp` assertion - AMD's TF wheels ship GPU
+   kernels for gfx1100 (among others), not for the newer 3.5-generation
+   APUs, so the GPU has to pretend to be a gfx1100.
+
+4. **Run setup** - with `backend: rocm` it installs AMD's
+   `tensorflow-rocm` wheel and installs microWakeWord `--no-deps` so the
+   plain CPU-only `tensorflow` wheel doesn't clobber it, then verifies a GPU
+   is visible:
+
+   ```bash
+   python3 -m trainer.local.cli setup
+   ```
+
+   (Already ran setup before switching to ROCm? Recreate the venv from
+   step 2 - a mixed CUDA/CPU/ROCm TensorFlow install is hard to unwind.)
+
+5. **Verify TensorFlow sees the AMD GPU:**
+
+   ```bash
+   python3 -c "import tensorflow as tf; print(tf.config.list_physical_devices('GPU'))"
+   ```
+
+   You should see a `PhysicalDevice` entry with `device_type='GPU'` (e.g.
+   `/physical_device/gpu:0` backed by your Radeon). If the list is empty,
+   re-check `rocminfo` from step 1 and that `rocm_release`/
+   `tensorflow_rocm_version` match your installed ROCm.
+
+6. **Launch the menu** for the rest of the pipeline, as usual:
+
+   ```bash
+   python3 -m trainer.local.cli
+   ```
+
+Notes:
+
+- Everything else (sample generation, feature building, .tflite conversion)
+  is CPU-based and unchanged; ROCm accelerates the `train` step, where it
+  matters.
+- If training crashes with a kernel/HIP error (e.g. a `hip_code_object.cpp`
+  assertion) on a very new GPU like gfx1150/gfx1151 (Ryzen AI MAX "Strix
+  Halo" or Strix), set `gpu.hsa_override_gfx_version: "11.0.0"` as shown
+  above - it makes the GPU masquerade as a target AMD built the TF kernels
+  for.
 
 ---
 

@@ -23,6 +23,30 @@ wake_word:
 # Relative paths are resolved relative to this config file's location.
 workspace: "workspace"
 
+gpu:
+  # "cpu", "cuda" (NVIDIA), or "rocm" (AMD).
+  # - cuda: setup additionally runs `pip install "tensorflow[and-cuda]"`.
+  # - rocm: setup installs AMD's tensorflow-rocm wheels from
+  #   https://repo.radeon.com/rocm/manylinux/rocm-rel-<rocm_release>/ and
+  #   installs microWakeWord --no-deps so the CPU-only PyPI tensorflow wheel
+  #   doesn't clobber it. The wheels only exist for Python 3.10 and 3.12,
+  #   so create the venv with one of those, and have the amdgpu driver +
+  #   ROCm installed first (see README "GPU note (AMD)").
+  backend: "cpu"
+  # ROCm release line to take wheels from; must match your installed ROCm
+  # (e.g. ROCm 7.2.x -> "7.2").
+  rocm_release: "7.2"
+  # tensorflow-rocm version available in that index. Pairing per ROCm docs:
+  # 6.4.x -> 2.16.2/2.17.1/2.18.1, 7.0.x -> 2.17.1/2.18.1/2.19.1,
+  # 7.1.x/7.2.x -> 2.18.1/2.19.1/2.20.0.
+  tensorflow_rocm_version: "2.19.1"
+  # RDNA 3.5 APUs (gfx1150 "Strix" / gfx1151 "Strix Halo", Radeon 780M/880M/
+  # 890M/8060S): set to "11.0.0" so TensorFlow's kernels (built for gfx1100)
+  # load; without this training crashes with a hip_code_object.cpp assertion.
+  # Leave empty ("") on GPUs AMD built TF kernels for (e.g. gfx906/gfx908/
+  # gfx90a/gfx1030/gfx1100).
+  hsa_override_gfx_version: ""
+
 piper:
   max_samples: 1000
   batch_size: 100

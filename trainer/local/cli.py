@@ -59,6 +59,12 @@ def main(argv: list[str] | None = None) -> int:
     ]:
         sub = subparsers.add_parser(name, help=help_text)
         _add_config_arg(sub, suppress_default=True)
+        if name == "setup":
+            sub.add_argument(
+                "--backend",
+                choices=["cpu", "cuda", "rocm"],
+                help="Override gpu.backend from the config (rocm installs AMD's tensorflow-rocm wheels)",
+            )
         if name == "train":
             sub.add_argument(
                 "--no-train",
@@ -89,6 +95,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "setup":
         from trainer.local import setup_env
 
+        if getattr(args, "backend", None):
+            config.gpu.backend = args.backend
         setup_env.run(config)
     elif args.command == "preview-word":
         from trainer.local import generate_samples

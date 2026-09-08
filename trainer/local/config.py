@@ -27,6 +27,34 @@ class WakeWordConfig:
 
 
 @dataclasses.dataclass
+class GpuConfig:
+    # "cpu", "cuda" (NVIDIA), or "rocm" (AMD). For "rocm", setup installs the
+    # tensorflow-rocm wheels from AMD's index (they only exist for Python
+    # 3.10 and 3.12, so create the venv with one of those). For "cuda", setup
+    # installs "tensorflow[and-cuda]" (needs a CUDA-capable Python <= 3.12
+    # on Linux/WSL).
+    backend: str = "cpu"
+    # ROCm release line used to pick AMD's wheel index
+    # (https://repo.radeon.com/rocm/manylinux/rocm-rel-<rocm_release>/).
+    # Must match your installed ROCm: 6.4.x -> 2.18.1 max, 7.0.x -> 2.19.1
+    # max, 7.1.x/7.2.x -> 2.20.0/2.19.1/2.18.1 (see rocm.docs.amd.com
+    # TensorFlow compatibility page).
+    rocm_release: str = "7.2"
+    # tensorflow-rocm version to install (must exist in that index).
+    tensorflow_rocm_version: str = "2.19.1"
+    # AMD's tensorflow-rocm wheels only ship GPU kernels for the GPU targets
+    # AMD built them for (e.g. gfx1100/gfx1101/gfx1102 for RDNA3), which does
+    # NOT include the newer RDNA 3.5 APUs (gfx1150 "Strix" / gfx1151 "Strix
+    # Halo", Radeon 780M/880M/890M/8060S) - without this, TF crashes with a
+    # hip_code_object.cpp assertion when it tries to load a kernel. Setting
+    # this exports HSA_OVERRIDE_GFX_VERSION for setup/training so the GPU
+    # pretends to be a supported target. Use "11.0.0" for gfx1150/gfx1151.
+    # Leave empty for GPUs ROCm natively supports (overriding those can break
+    # things).
+    hsa_override_gfx_version: str = ""
+
+
+@dataclasses.dataclass
 class PiperConfig:
     model_url: str = "https://github.com/rhasspy/piper-sample-generator/releases/download/v2.0.0/en_US-libritts_r-medium.pt"
     max_samples: int = 1000
@@ -100,6 +128,7 @@ class TrainingConfig:
 class TrainerConfig:
     wake_word: WakeWordConfig
     workspace: Path
+    gpu: GpuConfig = dataclasses.field(default_factory=GpuConfig)
     piper: PiperConfig = dataclasses.field(default_factory=PiperConfig)
     datasets: DatasetsConfig = dataclasses.field(default_factory=DatasetsConfig)
     augmentation: AugmentationConfig = dataclasses.field(default_factory=AugmentationConfig)
@@ -191,9 +220,14 @@ def load_config(path: str | Path) -> TrainerConfig:
         # so the pipeline behaves the same regardless of where it's invoked from.
         workspace = (path.parent / workspace).resolve()
 
+    gpu = _dataclass_from_dict(GpuConfig, raw.get("gpu"))
+    if gpu.backend not in ("cpu", "cuda", "rocm"):
+        raise ValueError(f"gpu.backend must be 'cpu', 'cuda', or 'rocm', got {gpu.backend!r}")
+
     return TrainerConfig(
         wake_word=wake_word,
         workspace=workspace,
+        gpu=gpu,
         piper=_dataclass_from_dict(PiperConfig, raw.get("piper")),
         datasets=_dataclass_from_dict(DatasetsConfig, raw.get("datasets")),
         augmentation=_dataclass_from_dict(AugmentationConfig, raw.get("augmentation")),
