@@ -21,6 +21,7 @@ import sys
 from pathlib import Path
 
 from trainer.local.config import TrainerConfig
+from trainer.local.setup_env import missing_modules
 
 
 def _slug(text: str) -> str:
@@ -62,6 +63,13 @@ def _generate_batch(config: TrainerConfig, phonetic: str, output_dir: Path, max_
 
 
 def run(config: TrainerConfig, preview_only: bool = False) -> None:
+    missing = missing_modules(("piper", "torch"))
+    if missing:
+        raise RuntimeError(
+            "Piper runtime dependencies are missing: "
+            + ", ".join(missing)
+            + ". Run the 'setup' step again."
+        )
     if not config.piper_model_path.exists():
         raise FileNotFoundError(
             f"Piper voice checkpoint not found at {config.piper_model_path}. "

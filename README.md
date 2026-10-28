@@ -1,107 +1,184 @@
-# Local microWakeWord V2 Trainer
+# microWakeWord V2 Trainer
 
-A local, script-driven alternative to `trainer/microwakeword_trainer_colab.ipynb` 
-that anyone can run.
-It runs the same underlying pipeline as the Colab notebook — synthesize wake
-word audio with Piper TTS, augment it with background noise and room
-impulse responses, turn that into spectrogram features, and train a
-[microWakeWord](https://github.com/kahrendt/microWakeWord) model — as a
-plain Python CLI you run on your own machine instead of in a Colab VM.
+[简体中文](README.md) | [English](README.en.md)
 
-## Requirements
+<p align="center">
+  <img src="docs/images/wakeword-studio.png" alt="Wakeword Studio 控制台界面" width="100%">
+</p>
 
-- Python 3.11 (due to microWakeWord dependencies, python version must be either 3.11 or 3.10)
-  - Later distributions of Ubuntu/Debian (26.04, Trixie) ship with Python 3.14. Either Deadsnakes PPA or pyenv will allow easy side by side installations of 3.14 and 3.11. Personal recommendation is pyenv. Either way you'll be using a virtual environment to handle dependencies, but I find pyenv a bit more straight forward by simply configuring py version on a folder/project level and proceeding without needing to actually activate a .venv.   
-- `git`
-- ~30-40 GB free disk per workspace (background/negative audio datasets are
-  the bulk of it: Audioset alone is several GB per split).
-  - After downloading audio datasets, multiple models can be trained without downloading again using the same workspace.
-- An NVIDIA GPU is optional but strongly recommended for training speed -
-  see the GPU note below. CPU-only works, just slowly (10,000 training
-  steps can take an hour or more on a laptop CPU). A GPU can be used both via WSL and in native Linux, but *not* using native Windows (Windows is CPU only)
+在本地训练 [microWakeWord](https://github.com/kahrendt/microWakeWord) V2 唤醒词模型。项目沿用原 Colab Notebook 的核心训练流程，并增加了适合本地长期使用的 HTML 控制台、CPU 容器化部署、任务日志和持久化工作区。
 
-## How long does training take
+本仓库是在原项目基础上的增强版，主要优化包括：
 
-- **Native Windows, via Surface Laptop Studio 2 CPU only** Using CPU only on Windows or WSL,
-  a training run (downloading all audio and training) takes about 70-80 minutes. About
-  half of that is downloading audio, which is only required once. So multiple models
-  takes ~40 minutes each.
-- **WSL2, via Surface Laptop Studio 2 with Nvidia 4050 GPU** I do not yet have the 4050 working with WSL
-  on the Surface Laptop. I'll update benchmark once I do but I'd expect a substantially
-  faster training time. Probably less than 15 minutes per model.
-- **Native Ubuntu 26.04, via AMD 9950X and a 2080TI** Using native Linux with Nvidia drivers version 595
-  takes about 30-40 minutes, including download times. After audio download, models can be produced in
-  about 5 minutes each.
+| 优化 | 说明 |
+| --- | --- |
+| **Web HTML 控制台** | 无需打开 Jupyter Notebook。通过浏览器完成配置、发音预览、样本生成、数据下载、特征构建、训练、模型导出和日志查看。 |
+| **中英文界面** | 控制台顶部可随时切换中文和英文，默认中文，并记住当前浏览器的语言选择。 |
+| **CPU 容器化部署** | 提供独立的 `Dockerfile.cpu` 和 `docker compose` 配置。镜像使用 PyTorch CPU wheel，不包含不可用的 CUDA 运行时。 |
+| **远程访问** | 默认将 `8188` 映射到宿主机所有网卡，可从局域网或 VPN 远程访问；也可通过环境变量限制为仅本机访问。 |
+| **持久化数据** | 样本、数据集、模型、日志和配置保存在宿主机 `workspace/`，重建容器不会删除训练结果。 |
+| **国内网络优化** | 支持 Hugging Face 镜像、HTTP/HTTPS/SOCKS 代理、PyPI 镜像，并针对 HTTP 代理关闭不兼容的 Hugging Face Xet 传输。 |
+| **多语言文档** | 默认提供中文 README，并保留完整英文文档。 |
 
+## 快速开始：Docker CPU 版
 
-## What this does differently from the baseline notebook
+需要 Docker 和 Docker Compose。推荐准备约 30–40 GB 可用磁盘空间，用于背景音频、特征和训练结果。
 
-- **Fixes a missing step.** The notebook's training-config cell references a
-  `generated_features_output_dir` variable that's never defined anywhere -
-  the cell that actually turns augmented clips into the spectrogram features
-  microWakeWord trains on is absent. `build_features.py` (the
-  `build-features` command) is that missing step, ported from microWakeWord's
-  own upstream `notebooks/basic_training_notebook.ipynb`.
-- **Supports multiple phonetic spellings of the same wake word**
-  (`wake_word.additional_phonetics` in the config) - each spelling gets its
-  own full batch of generated samples, which generally improves the model's
-  robustness to different pronunciations.
-- **Resumable, idempotent steps.** Every step checks what it's already done
-  and skips it, so you can re-run the same command after an interruption
-  (or after changing a downstream config value) without redoing finished
-  work.
-- **Routes around several environment-specific dependency issues** (see
-  [Troubleshooting](#troubleshooting--why-does-setup-do-all-that) below) that
-  the original notebook doesn't have to deal with, since Colab's VM image
-  and package versions are fixed at the time the notebook was written.
-- **Menu-driven by default.** `python -m trainer.local.cli` (no arguments)
-  launches an interactive menu that runs every step below in order and only
-  stops to ask you something when a step genuinely needs a human decision -
-  see [Running the pipeline](#running-the-pipeline).
-
-## Pipeline overview
-
-```
-setup              → clone/install microWakeWord + piper-sample-generator, download the Piper voice model
-preview-word       → generate 1 sample, listen to it, adjust phonetic spelling
-generate-samples   → generate the full batch of synthetic wake word samples
-download-data      → download RIR / Audioset / FMA background audio + pre-built negative feature sets
-preview-augment    → (optional) generate 1 augmented clip to sanity-check augmentation settings
-build-features     → augment samples, build train/validation/test spectrogram feature mmaps
-train              → train the model, quantize + convert to a streaming .tflite
-export             → copy the .tflite + write an ESPHome V2 model manifest .json
+```bash
+cd ~/github/dfxiang/MicroWakeWordV2Trainer
+cp .env.example .env
+docker compose up --build -d
 ```
 
-Everything a run produces - cloned repos, downloaded datasets, generated
-samples, feature mmaps, trained checkpoints, and the final exported model -
-lives under one `workspace/` directory (configurable), so different wake
-words can have entirely independent workspaces.
+在宿主机打开 <http://127.0.0.1:8188>，或从其他设备访问：
 
-### GPU note (Windows)
+```text
+http://<宿主机IP>:8188
+```
 
-TensorFlow dropped native GPU support on Windows after version 2.10, and
-microWakeWord requires `tensorflow>=2.18`. That means:
+停止服务但不删除数据：
 
-- **Native Windows** (PowerShell, no WSL): training runs **CPU-only**, no
-  matter what GPU you have.
-- **WSL2** (Windows Subsystem for Linux): TensorFlow can use an NVIDIA GPU
-  normally, via the same driver passthrough any other WSL2 CUDA workload
-  uses.
-- **Native Linux** (Tested Ubuntu 26.04): Provided that both Nvidia drivers and CUDA
-  drivers are installed prior to installing TensorFlow with CUDA, GPU should work fine.
-   
-The commands below are the same for Windows and WSL; only the initial environment setup
-differs. Pick whichever section matches how you want to run it. The commands for Native Linux
-are identical to WSL, save for driver installation
+```bash
+docker compose down
+```
 
----
+查看容器日志：
 
-## Setup & run — Windows (native, CPU-only)
+```bash
+docker compose logs -f trainer
+```
 
-1. Install [Python 3.11](https://www.python.org/downloads/) and
-   [Git](https://git-scm.com/download/win) if you don't already have them.
+> **安全提示：** 控制面板目前没有登录认证。暴露到局域网或公网时，只应开放给可信网络，或将其放到带认证的反向代理、VPN 后面。
 
-2. From the repo root, in PowerShell:
+## HTML 控制台功能
+
+打开 Web 页面后可以：
+
+1. 编辑并校验 `workspace/wakeword_config.yaml`。
+2. 运行运行环境 Setup。
+3. 输入唤醒词音标，生成并试听发音预览。
+4. 批量生成 Piper 合成样本。
+5. 下载 RIR、Audioset、FMA 和负样本数据。
+6. 预览增强后的音频，构建频谱特征。
+7. 启动训练，实时查看日志并取消正在运行的任务。
+8. 下载导出的 `.tflite` 模型和 ESPHome V2 `.json` 清单。
+
+所有任务通过单一进程管理，避免同时启动多个训练任务。任务输出写入 `workspace/logs/`。
+
+## Docker 配置
+
+配置文件：[compose.yaml](compose.yaml)
+
+镜像定义：[Dockerfile.cpu](Dockerfile.cpu)
+
+环境变量示例：[.env.example](.env.example)
+
+Docker Compose 会将 `/opt/venv` 保存到 `trainer-venv` 命名卷，避免容器重建后
+Setup 安装的 Python 依赖丢失。`docker compose down` 会保留该卷；
+`docker compose down -v` 会删除它，需要重新运行 Setup。
+
+常用环境变量：
+
+| 变量 | 默认值 | 说明 |
+| --- | --- | --- |
+| `TRAINER_BIND_HOST` | `0.0.0.0` | Web 服务绑定地址。仅本机访问时设为 `127.0.0.1`。 |
+| `TRAINER_PORT` | `8188` | 宿主机端口。 |
+| `HF_TOKEN` | 空 | 可选 Hugging Face Token，可降低匿名下载限流。 |
+| `HF_ENDPOINT` | 示例中为 `https://hf-mirror.com` | Hugging Face 及其数据集下载地址。 |
+| `HF_HUB_DISABLE_XET` | `1` | 关闭部分 HTTP 代理下会断开的 Xet 加速。 |
+| `HTTP_PROXY` | 空 | HTTP 代理，例如 `http://host.docker.internal:1080`。 |
+| `HTTPS_PROXY` | 空 | HTTPS 代理。 |
+| `ALL_PROXY` | 空 | 其他协议的代理回退。 |
+| `TRAINER_NO_PROXY` | 本机与国内镜像 | 不需要经过代理的地址。Compose 会将其映射为容器内的 `NO_PROXY`。 |
+| `PIP_INDEX_URL` | 华为云 PyPI 镜像 | 容器运行期间安装 Python 依赖使用。 |
+| `BUILD_PIP_INDEX_URL` | 阿里云 PyPI 镜像 | 构建镜像时安装依赖使用。 |
+
+若宿主机代理监听 `1080` 端口，可使用：
+
+```dotenv
+HTTP_PROXY=http://host.docker.internal:1080
+HTTPS_PROXY=http://host.docker.internal:1080
+ALL_PROXY=http://host.docker.internal:1080
+HF_ENDPOINT=https://hf-mirror.com
+HF_HUB_DISABLE_XET=1
+TRAINER_NO_PROXY=localhost,127.0.0.1,::1,host.docker.internal
+```
+
+修改 `.env` 后重新创建容器：
+
+```bash
+docker compose up -d --force-recreate
+```
+
+## 训练流程
+
+```text
+setup
+  → 克隆并安装 microWakeWord 和 piper-sample-generator，下载 Piper 声音模型
+
+preview-word
+  → 生成 1 条发音样本并试听，调整唤醒词音标
+
+generate-samples
+  → 批量生成 Piper 合成样本
+
+download-data
+  → 下载 RIR、Audioset、FMA 背景音频和负样本特征
+
+preview-augment
+  → 可选：生成 1 条增强音频，检查增强参数
+
+build-features
+  → 生成训练、验证、测试频谱特征
+
+train
+  → 训练、量化并转换为流式 .tflite
+
+export
+  → 导出 .tflite 和 ESPHome V2 模型清单
+```
+
+运行产生的克隆仓库、训练数据、样本、特征、检查点和导出模型都保存在 `workspace/` 中。不同配置文件可以使用不同工作区，从而并行管理多个唤醒词。
+
+## 依赖与运行时间
+
+- Python 3.11 或 Python 3.10；推荐 Python 3.11。
+- `git`。
+- 每个工作区建议准备 30–40 GB 可用磁盘空间。
+- NVIDIA GPU 可选。CPU 也能完成训练，但 10,000 步在一个 CPU 主机上可能超过一小时。
+- Windows 原生环境只能使用 CPU；WSL2 和原生 Linux 可以使用 NVIDIA GPU。
+
+参考运行时间：
+
+| 环境 | 完整训练时间 |
+| --- | --- |
+| Surface Laptop Studio 2，CPU | 约 70–80 分钟；音频下载通常只发生一次，后续模型约 40 分钟。 |
+| 同一设备，WSL2 + NVIDIA 4050 | GPU 在 WSL 中的配置仍待验证，预计显著快于 CPU。 |
+| AMD 9950X + NVIDIA 2080 Ti，原生 Ubuntu | 包含下载约 30–40 分钟；数据下载完成后每个模型约 5 分钟。 |
+
+## 相比原始 Notebook 的改进
+
+- **补齐训练步骤。** 原始 Notebook 引用了未定义的 `generated_features_output_dir`，且缺少将增强音频转换成频谱特征的步骤。本项目通过 `build_features.py` 和 `build-features` 命令补齐这一步。
+- **支持同一唤醒词的多个音标。** 在 `wake_word.additional_phonetics` 中配置不同发音，每个音标都会生成完整样本批次，通常能增强对不同口音的鲁棒性。
+- **步骤可重复执行。** 各步骤会检查已有结果并跳过已完成工作，因此中断后可以重新执行。
+- **Web 化操作。** 配置、执行、日志、取消任务、音频预览和模型下载都可以在浏览器完成。
+- **本地容器部署。** CPU 依赖、系统工具、用户权限和持久化目录都封装在镜像与 Compose 配置中。
+- **适应受限网络。** 支持 PyPI 镜像、Hugging Face 镜像和宿主机代理。
+
+## GPU 说明
+
+TensorFlow 2.10 之后不再提供 Windows 原生 GPU 支持，而 microWakeWord 要求 `tensorflow>=2.18`：
+
+- **Windows 原生环境：** 即使有 NVIDIA GPU，训练仍使用 CPU。
+- **WSL2：** 可以按标准 WSL2 CUDA 方式将 Windows 的 NVIDIA 驱动透传给 TensorFlow。
+- **原生 Linux：** 建议先安装 NVIDIA 驱动和 CUDA 工具包，再安装 CUDA 版 TensorFlow。
+
+CPU Docker 镜像有意不启用 GPU 透传。需要 GPU 训练时，应使用原生 Linux/WSL 环境，或另外维护 GPU 版镜像。
+
+## Windows 原生 CPU 设置
+
+1. 安装 [Python 3.11](https://www.python.org/downloads/) 和 [Git](https://git-scm.com/download/win)。
+2. 在项目根目录打开 PowerShell：
 
    ```powershell
    python -m venv .venv
@@ -109,338 +186,123 @@ are identical to WSL, save for driver installation
    pip install -r trainer\requirements.txt
    ```
 
-3. Create your wake word config:
+3. 创建配置：
 
    ```powershell
    Copy-Item trainer\wakeword_config.example.yaml trainer\wakeword_config.yaml
    ```
 
-   Edit `trainer\wakeword_config.yaml` - at minimum set `wake_word.phonetic`
-   and `wake_word.friendly_name`. See the comments in
-   `trainer\wakeword_config.example.yaml` for what every other field does.
-
-4. Launch the interactive menu - it installs the rest of the toolchain
-   (microWakeWord, piper-sample-generator, the Piper voice checkpoint) as its
-   first step, then walks you through the rest of the pipeline. See
-   [Running the pipeline](#running-the-pipeline) below.
+4. 至少修改 `wake_word.phonetic` 和 `wake_word.friendly_name`，然后启动交互菜单：
 
    ```powershell
    python -m trainer.local.cli
    ```
-   
-   
 
----
+## WSL2 与原生 Linux 设置
 
-## Setup & run — WSL2 and Native Linux (recommended for GPU training)
-
-1. **Either Install WSL2 with Ubuntu, or install Ubuntu directly**
-
-   To install Ubuntu for WSL2 for Windows, from a PowerShell prompt:
+1. 安装 Ubuntu。Windows 可执行：
 
    ```powershell
    wsl --install -d Ubuntu
    ```
 
-   Reboot if prompted, then open an Ubuntu WSL terminal once to finish first-time
-   setup (creates your Linux user account).
+2. 安装适用的 NVIDIA 驱动。
 
-## Nvidia Driver Install, do only one of the below ##
-
-2. **WSL2: Install an NVIDIA driver on the Windows side only.** Download the
-   latest driver from
-   [nvidia.com](https://www.nvidia.com/Download/index.aspx) and install it
-   normally on Windows. Do **not** install a separate NVIDIA Linux driver
-   inside WSL - WSL2 shares the Windows host's driver via GPU passthrough,
-   and installing one inside Ubuntu will break it.
-
-2. OR: **Native Ubuntu: Install NVIDIA and CUDA drivers .** 
-
-   To install Nvidia drivers on Ubuntu, start by installing the Ubuntu proprietary driver installer:
+   WSL2 只安装 Windows 端驱动，不要在 WSL 内再安装 NVIDIA Linux 驱动。原生 Ubuntu 可按系统提示使用 `ubuntu-drivers`：
 
    ```bash
    sudo apt-get install ubuntu-drivers-common
-   ```
-
-   Verify that an Nvidia GPU is installed in the system
-
-   ```bash
    ubuntu-drivers devices
-   ```
-
-   You should see an output of drivers compatible with the system, along with the compatible device itself (see below. I selected the 595 drivers for training)
-  <img width="667" height="480" alt="image" src="https://github.com/user-attachments/assets/422ca162-3457-4bdd-a772-d7873eee00d3" />
-
-   Install one of the compatible drivers via ubuntu-drivers (I chose 595)
-
-   ```bash
-   sudo ubuntu-drivers install nvidia-driver-595
-   ```
-
-   Reboot after Nvidia driver install
-
-   ```bash
+   sudo ubuntu-drivers install
    sudo reboot
    ```
 
-   Install CUDA toolkit after reboot
+   如需自行安装 CUDA 工具包：
 
    ```bash
    sudo apt install nvidia-cuda-toolkit -y
-   ```
-
-   **Verify the GPU and CUDA is visible inside Linux/WSL:**
-
-   ```bash
    nvidia-smi
    ```
 
-   Make sure this prints your **GPU**, **Nvidia driver version**, and **CUDA toolkit version** version. (See below)
-   If it fails, or fails to print CUDA version, reinstall as necessary
-   
-   <img width="752" height="711" alt="image" src="https://github.com/user-attachments/assets/ac75fe9f-5c93-48a7-bd24-278d8137d18e" />
+3. 安装 Python 3.11、虚拟环境和构建工具。新版 Ubuntu 可使用 Deadsnakes PPA 或 pyenv 安装 Python 3.11。
 
-
-
-4. **Install build tools and Python 3.11** inside Ubuntu (WSL and Native Ubuntu):
-
-   *Remember this needs to be python 3.11. The below will work with older versions of Ubuntu or Debian,
-   but for newer versions that ship with 3.12+, make sure to use the DeadSnakes repo for Ubuntu to install 3.11
-   side by side with the modern Ubuntu/Debian version.
-   
-   Alternatively, and my personal recommendation, is to install pyenv and pyenv-virtualenv, and use pyenv to install 3.11*.
-
-   An AI overview of installing Python 3.11 on Ubuntu 26.04 using PyEnv [**can be found here**](https://www.google.com/search?q=install+python+3.11+ubuntu+26.04+pyenv)
-
-   For older versions of Ubuntu (22.04, 24.04?), you can install via apt:
-   
-   ```bash
-   sudo apt update
-   sudo apt install -y python3 python3-venv python3-pip build-essential git
-   ```
-
-   
-
-5. **Clone the repo.**
-   
-   ```bash
-   git clone https://github.com/JohnnyPrimus/MicroWakeWordV2Trainer.git ~/MicroWakeWordV2Trainer
-   ```
-   
-6. Option 1) **Set up the Python environment (native Python install):**
+4. 安装 Python 依赖：
 
    ```bash
-   cd ~/MicroWakeWordV2Trainer
+   git clone https://github.com/dfxiang/MicroWakeWordV2Trainer.git
+   cd MicroWakeWordV2Trainer
    python3 -m venv .venv
    source .venv/bin/activate
    pip install -r trainer/requirements.txt
    ```
-   Option 2) **Setup pyenv environment:**
 
-   ```bash
-   cd ~/MicroWakeWordV2Trainer
-   pyenv local 3.11
-   pip install -r trainer/requirements.txt
-   ```
-
-7. **Create your wake word config** (same as the Windows instructions):
+5. 创建配置：
 
    ```bash
    cp trainer/wakeword_config.example.yaml trainer/wakeword_config.yaml
    ```
 
-   Edit wakeword_config.yaml - at minimum `wake_word.phonetic` and `wake_word.friendly_name`.
-
-8. **Run setup**, then explicitly install the CUDA-enabled TensorFlow
-   extras (microWakeWord's own dependency list just says `tensorflow`,
-   which alone doesn't pull in the CUDA/cuDNN wheels):
+6. 执行 Setup，再安装 CUDA 版 TensorFlow：
 
    ```bash
    python3 -m trainer.local.cli setup
    pip install "tensorflow[and-cuda]"
    ```
 
-9. **Verify TensorFlow sees the CPU:**
+7. 验证 CPU 和可选 GPU：
 
    ```bash
    python3 -c "import tensorflow as tf; print(tf.reduce_sum(tf.random.normal([1000, 1000])))"
-   ```
-
-   You should see a no error and a tensor shown at the end of the output. (See below)
-   <img width="1417" height="392" alt="image" src="https://github.com/user-attachments/assets/cd6d92f2-f38c-4a73-8702-af20fec2dbb0" />
-
-
-9.1 **Optional: Verify TensorFlow sees the GPU:**
-
-   If you either have GPU passthrough via WSL working, or have installed both the Nvidia and CUDA drivers, check to
-   ensure TensorFlow can see the GPU
-
-   ```bash
    python3 -c "import tensorflow as tf; print(tf.config.list_physical_devices('GPU'))"
    ```
 
-   You should see a `PhysicalDevice` entry with `device_type='GPU'`. If the
-   list is empty, re-check steps 2-3 and step 8's `tensorflow[and-cuda]`
-   install. (See below)
-   <img width="1442" height="376" alt="tensorflow_detect_GPU" src="https://github.com/user-attachments/assets/eac4be03-b198-4fde-8710-26e66e694097" />
+8. 启动交互菜单：
 
+   ```bash
+   python3 -m trainer.local.cli
+   ```
 
+如果显存较小并出现 OOM，请降低配置中的 `training.batch_size`（默认值为 128）。
 
-10. Launch the interactive menu for the rest of the pipeline - see
-    [Running the pipeline](#running-the-pipeline) below. Its first step re-runs `setup`, which is safe here too - it
-    won't touch the CUDA-enabled TensorFlow you just installed in step 8.
+## 命令行运行
 
-If you're using a GPU with limited VRAM (e.g. a laptop GPU with 6-8 GB), and training
-fails with an out-of-memory error, lower `training.batch_size` in the
-config (default 128).
+不带参数启动交互菜单：
 
----
-
-## Running the pipeline
-
-The recommended way to run everything is the interactive menu:
-
-```
+```bash
 python3 -m trainer.local.cli
 ```
 
-(On Windows: **`python`** rather than python3.) 
+也可以单独执行某一步：
 
-It walks through every step below in order -
-setup, preview-word, generate-samples, download-data, preview-augment,
-build-features, train, export - running each one automatically, and only
-stops at points that decisions are optional or required, for example listening to a 
-preview and confirming it sounds right (see sample_models directory for examples), choosing
-whether to retrain over an existing checkpoint, picking a probability
-cutoff after looking at the ROC results, and entering export metadata.
-Everything else just runs straight through. If `trainer/wakeword_config.yaml`
-doesn't exist yet, it offers to create one interactively on first launch.
-From the main menu you can also jump in and re-run starting from any
-individual step (e.g. after editing the config).
-
-Pass `--config <path>` (before or after the subcommand) to point at a
-different config file - e.g. to train several wake words side by side, since
-each config's `workspace` directory is independent.
-
-
-
-## Scripting the pipeline or running individual steps
-
-Every step is also available as its own `python -m trainer.local.cli
-<command>` for scripting a single step directly, documented below. Both
-forms are equivalent - the menu just makes things easier. Every step is safe to re-run either way: it checks
-what it's already produced and skips finished work.
-
-1. **Check the phonetic spelling** by generating one sample and listening to it:
-
-   ```
-   python -m trainer.local.cli preview-word
-   ```
-
-   Listen to `workspace/preview_samples/<friendly_name>/<slug>/0.wav`.
-   Adjust `wake_word.phonetic` in the config until it sounds right, then
-   re-run.
-
-2. **Generate the full sample batch:**
-
-   ```
-   python -m trainer.local.cli generate-samples
-   ```
-
-   Generates `piper.max_samples` samples for `wake_word.phonetic`, plus a
-   full batch for each entry in `wake_word.additional_phonetics` (see
-   [Multiple phonetic spellings](#multiple-phonetic-spellings) below).
-   Controlled by `piper.max_samples` / `piper.batch_size` in the config -
-   this is the step to revisit first when trying to improve a model: more
-   samples, more phonetic variants, or different `length_scales`/
-   `noise_scales` all help.
-
-3. **Download background/negative audio data** (RIRs, Audioset, FMA, and
-   pre-generated negative spectrogram sets). This is the slowest step -
-   expect 30-45+ minutes and several GB of disk:
-
-   ```
-   python -m trainer.local.cli download-data
-   ```
-
-   > **License note:** this data mixes several licenses and usage
-   > restrictions. Treat models trained with it as personal-use only unless
-   > you check the license of each source for commercial use.
-
-4. **(Optional) Preview an augmented clip:**
-
-   ```
-   python -m trainer.local.cli preview-augment
-   ```
-
-   Writes `augmented_clip_preview.wav` in the current directory, so you can
-   listen to what the augmentation pipeline (background noise mixing, RIR,
-   pitch/gain/EQ perturbation) actually sounds like.
-
-5. **Build spectrogram features** (augments samples, builds the
-   training/validation/testing feature mmaps):
-
-   ```
-   python -m trainer.local.cli build-features
-   ```
-
-   Re-run this after adding samples (a new phonetic spelling, more
-   generated samples, etc.) - it globs `generated_samples/<name>/**/*.wav`
-   fresh each time it needs to rebuild a split.
-
-6. **Train:**
-
-   ```
-   python -m trainer.local.cli train
-   ```
-
-   Hyperparameters live under `training:` in the config (training steps,
-   class weights, learning rate, model architecture args, etc.) - these
-   matter a lot for model quality, especially for very short or long wake
-   words. This step also quantizes and converts the best checkpoint to a
-   streaming `.tflite`, and writes real test results to
-   `workspace/trained_models/<name>/tflite_stream_state_internal_quant/tflite_streaming_roc.txt`
-   (see [Choosing a probability cutoff](#choosing-a-probability-cutoff)).
-
-   **Resuming:** if training is interrupted, just run the same command
-   again - it restores the last checkpoint's *weights* automatically. Note
-   that microWakeWord's own training script always re-runs the full
-   `training_steps` budget from step 0 on resume (it doesn't remember how
-   many steps it had already done), so a resumed run isn't "picking up
-   where it left off" step-count-wise, even though it's warm-started from
-   good weights. If the model already looks converged (check the
-   `Step N (nonstreaming): Validation: ...` log lines - `average_viable_recall`
-   near 1.0 with 100% precision is a good sign), you can skip straight to
-   converting the existing best checkpoint instead of retraining:
-
-   ```
-   python -m trainer.local.cli train --no-train
-   ```
-
-7. **Export for ESPHome:**
-
-   ```
-   python -m trainer.local.cli export --probability-cutoff 0.9
-   ```
-
-   Writes `workspace/exported_models/<name>/<name>.tflite` and a matching
-   `.json` V2 model manifest (see the
-   [ESPHome docs](https://esphome.io/components/micro_wake_word) and
-   [example manifests](https://github.com/esphome/micro-wake-word-models/tree/main/models/v2)).
-   Flags: `--probability-cutoff` (default 0.5), `--tensor-arena-size`
-   (default 30000), `--author`, `--website`. Raise `--tensor-arena-size` if
-   ESPHome fails to load the model.
-
-Steps 3, 5, and 6 can also be run together once setup/samples are done:
-
-```
-python -m trainer.local.cli all
+```bash
+python3 -m trainer.local.cli preview-word
+python3 -m trainer.local.cli generate-samples
+python3 -m trainer.local.cli download-data
+python3 -m trainer.local.cli preview-augment
+python3 -m trainer.local.cli build-features
+python3 -m trainer.local.cli train
+python3 -m trainer.local.cli export --probability-cutoff 0.9
 ```
 
-## Multiple phonetic spellings
+使用其他配置文件：
 
-Add alternate phonetic spellings of the same wake word to broaden the
-model's coverage of how it might actually be pronounced:
+```bash
+python3 -m trainer.local.cli --config path/to/wakeword_config.yaml train
+```
+
+Setup、样本和配置都完成后，可以连续执行数据下载、特征构建和训练：
+
+```bash
+python3 -m trainer.local.cli all
+```
+
+如果模型已收敛但训练被中断，可以跳过重新训练，直接转换已有最佳检查点：
+
+```bash
+python3 -m trainer.local.cli train --no-train
+```
+
+## 多个音标
 
 ```yaml
 wake_word:
@@ -451,63 +313,53 @@ wake_word:
     - "hey wah-bee"
 ```
 
-`generate-samples` generates a full `piper.max_samples`-sized batch for
-each spelling, into its own subdirectory under `generated_samples/<name>/`.
-`build-features` picks up every spelling's samples automatically. In
-testing, adding a second spelling to an already-good model did lower the
-best achievable false-rejection-rate-at-zero-false-alarms slightly (broader
-phonetic coverage makes the classification task harder) - this is a real
-accuracy/robustness tradeoff, not a bug, so check
-`tflite_streaming_roc.txt` after retraining rather than assuming more
-spellings is strictly better for your specific wake word.
+每个音标都会生成一个完整的 `piper.max_samples` 样本批次。更多音标可以改善发音覆盖，但也会增加分类难度，应在训练后查看 `tflite_streaming_roc.txt` 再决定是否保留。
 
-## Choosing a probability cutoff
+## 选择概率阈值
 
-After `train`, `workspace/trained_models/<name>/tflite_stream_state_internal_quant/tflite_streaming_roc.txt`
-lists, for a range of cutoffs: `frr` (false-rejection rate - how often a
-real wake word utterance is missed) and `faph` (estimated false alarms per
-hour on ambient/negative audio). For a voice assistant wake word, false
-alarms are usually more annoying than an occasional missed trigger, so
-picking the lowest cutoff with `faph=0.000` is a reasonable default -
-that's what `export`'s `--probability-cutoff` flag should be set to. Lower
-the cutoff (accepting some false alarms) if it feels unresponsive in
-practice; raise it if it triggers on background noise or speech.
+训练完成后，ROC 文件位于：
 
-## Troubleshooting / why does `setup` do all that?
+```text
+workspace/trained_models/<name>/tflite_stream_state_internal_quant/tflite_streaming_roc.txt
+```
 
-Several dependency issues showed up getting this running on Windows that
-you likely won't hit again since `setup_env.py` already works around them,
-but are worth knowing about if something still breaks:
+其中：
 
-- **`ModuleNotFoundError: No module named 'torchcodec'` /
-  `ImportError: ... please install 'torchcodec'`**: newer `datasets`
-  library versions require `torchcodec` (which itself needs a matching
-  system FFmpeg install) just to decode/encode audio, even for local files.
-  We pin `datasets<4.0` and don't use `datasets` at all in
-  `download_datasets.py`, specifically to avoid this. If you see this
-  error, something reinstalled a newer `datasets` - re-run
-  `pip install "datasets<4.0"`.
-- **`ModuleNotFoundError: No module named 'piper_train'`**: piper-sample-generator's
-  PyPI package only ships the `piper_sample_generator` module, not the
-  sibling `piper_train` module its multi-speaker generator code path
-  imports. `setup` clones the full repo instead of just pip-installing the
-  package, and `generate_samples.py` puts the repo root on `PYTHONPATH`.
-- **`AttributeError: module 'audiomentations' has no attribute 'AddColorNoise'`**:
-  piper-sample-generator pins `audiomentations==0.33.0`, which predates
-  that transform, but microWakeWord's augmentation needs it. `setup`
-  installs a newer `audiomentations` afterward, overriding that pin (safe -
-  we never use piper-sample-generator's own `.augment` module).
-- **`ModuleNotFoundError: No module named 'pkg_resources'`**: `webrtcvad`
-  still does `import pkg_resources` at load time; `setuptools>=81` removed
-  that shim. `setup` pins `setuptools<81`.
-- **`tensorflow.python.summary.tb_summary.TBNotInstalledError`**:
-  microWakeWord's training script logs metrics via `tf.summary.scalar`,
-  which needs `tensorboard` installed even though nothing views the logs.
-  `setup` installs it.
-- **A rebuilt `build-features` split turns out empty**: `RaggedMmap.from_generator`
-  creates its output directory before writing any data, so a crash
-  mid-build can leave an empty-but-existing directory. `build_features.py`
-  checks for the actual data file, not just the directory, before deciding
-  a split is already done - if you're on an older checkout without that
-  fix, delete `workspace/generated_augmented_features/<name>/<split>/`
-  and re-run.
+- `frr`：误拒率，真实唤醒词被漏掉的概率。
+- `faph`：环境音和负样本上的估计每小时误唤醒次数。
+
+对于语音助手，通常优先选择 `faph=0.000` 条件下最低的阈值。误唤醒过多时提高阈值；真实唤醒不灵敏时降低阈值。
+
+## 常见问题
+
+- **`No module named 'torchcodec'`**
+  新版 `datasets` 解码音频时需要 `torchcodec`。项目固定使用 `datasets<4.0`，且数据下载逻辑不依赖 `datasets`。若错误再次出现，重新安装 `pip install "datasets<4.0"`。
+
+- **`No module named 'piper_train'`**
+  PyPI 的 piper-sample-generator 包不包含 `piper_train`。项目会克隆完整源码，并设置 `PYTHONPATH`。
+
+- **`audiomentations` 缺少 `AddColorNoise`**
+  项目会在 Setup 中覆盖原始旧版本约束，安装 `audiomentations>=0.35`。
+
+- **`No module named 'pkg_resources'`**
+  使用 `setuptools<81`，兼容仍依赖该模块的 `webrtcvad`。
+
+- **`TBNotInstalledError`**
+  项目会在 Setup 中安装 `tensorboard`。
+
+- **Hugging Face 下载出现 `Network is unreachable`**
+  检查 `.env` 中的 `HF_ENDPOINT` 和代理设置，将宿主机代理写为 `http://host.docker.internal:<端口>`。
+
+- **代理下载发生 `SSL: UNEXPECTED_EOF_WHILE_READING`**
+  保持 `HF_HUB_DISABLE_XET=1`，关闭与代理不兼容的 Xet 加速。
+
+- **`build-features` 的分组为空**
+  删除对应空目录后重新运行：
+
+  ```text
+  workspace/generated_augmented_features/<name>/<split>/
+  ```
+
+## 许可证和数据许可
+
+项目代码遵循仓库中的 [LICENSE](LICENSE)。RIR、Audioset、FMA 等训练数据具有不同许可证和使用限制。使用这些数据训练的模型默认只应按个人用途处理，除非你逐一确认各数据源允许商业使用。

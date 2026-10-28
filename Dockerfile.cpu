@@ -1,0 +1,69 @@
+# syntax=docker/dockerfile:1.7
+
+# CPU-only image for the local microWakeWord V2 trainer.
+# PyTorch is installed from the explicit CPU wheel index, so this image does
+# not download CUDA runtime wheels that cannot be used on this machine.
+FROM python:3.11-slim-bookworm
+
+ARG DEBIAN_FRONTEND=noninteractive
+ARG APP_UID=1000
+ARG APP_GID=1000
+ARG PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_INDEX_URL=${PIP_INDEX_URL} \
+    VIRTUAL_ENV=/opt/venv \
+    PATH=/opt/venv/bin:$PATH \
+    TRAINER_CONFIG=/data/wakeword_config.yaml \
+    HF_HOME=/data/.cache/huggingface \
+    XDG_CACHE_HOME=/data/.cache
+
+RUN find /etc/apt -type f \( -name '*.list' -o -name '*.sources' \) -exec sed -i \
+        -e 's|http://deb.debian.org/debian-security|http://mirrors.aliyun.com/debian-security|g' \
+        -e 's|http://deb.debian.org/debian|http://mirrors.aliyun.com/debian|g' {} + \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+        build-essential \
+        ca-certificates \
+        cmake \
+        curl \
+        espeak-ng \
+        git \
+        libgomp1 \
+        libsndfile1 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN python -m venv /opt/venv \
+    && python -m pip install --upgrade pip
+
+WORKDIR /app
+
+COPY trainer/requirements.txt /tmp/trainer-requirements.txt
+RUN pip install -r /tmp/trainer-requirements.txt \
+    && rm /tmp/trainer-requirements.txt
+
+# This machine has no NVIDIA GPU. Installing from PyTorch's CPU index keeps
+# the image substantially smaller and avoids unusable CUDA runtime packages.
+RUN pip install --index-url https://download.pytorch.org/whl/cpu \
+        torch \
+        torchaudio
+
+RUN groupadd --gid "${APP_GID}" trainer \
+    && useradd --uid "${APP_UID}" --gid trainer --create-home --shell /bin/bash trainer \
+    && mkdir -p /data \
+    && chown -R trainer:trainer /opt/venv /data
+
+COPY --chown=trainer:trainer README.md LICENSE ./
+COPY --chown=trainer:trainer trainer ./trainer
+
+USER trainer
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD ["curl", "--fail", "--silent", "--show-error", "--noproxy", "*", "http://127.0.0.1:8000/api/health"]
+
+CMD ["uvicorn", "trainer.web.app:app", "--host", "0.0.0.0", "--port", "8000"]

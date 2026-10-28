@@ -1,0 +1,34 @@
+services:
+  trainer:
+    build:
+      context: .
+      dockerfile: Dockerfile.cpu
+      args:
+        APP_UID: "${APP_UID:-1000}"
+        APP_GID: "${APP_GID:-1000}"
+        PIP_INDEX_URL: "${BUILD_PIP_INDEX_URL:-https://mirrors.aliyun.com/pypi/simple}"
+    image: microwakeword-v2-trainer:cpu
+    init: true
+    ports:
+      - "${TRAINER_BIND_HOST:-0.0.0.0}:${TRAINER_PORT:-8188}:8000"
+    environment:
+      HF_TOKEN: "${HF_TOKEN:-}"
+      HF_ENDPOINT: "${HF_ENDPOINT:-https://huggingface.co}"
+      HF_HUB_DISABLE_XET: "${HF_HUB_DISABLE_XET:-1}"
+      TRAINER_CONFIG: /data/wakeword_config.yaml
+      TRAINER_WORKSPACE: /data
+      PIP_INDEX_URL: "${PIP_INDEX_URL:-https://mirrors.huaweicloud.com/repository/pypi/simple}"
+      HTTP_PROXY: "${HTTP_PROXY:-}"
+      HTTPS_PROXY: "${HTTPS_PROXY:-}"
+      ALL_PROXY: "${ALL_PROXY:-}"
+      NO_PROXY: "${TRAINER_NO_PROXY:-localhost,127.0.0.1,::1,host.docker.internal,mirrors.aliyun.com,mirrors.huaweicloud.com}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./workspace:/data
+      - trainer-venv:/opt/venv
+    shm_size: "2gb"
+    stop_grace_period: 30s
+
+volumes:
+  trainer-venv:

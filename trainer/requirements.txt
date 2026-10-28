@@ -16,6 +16,10 @@ soundfile
 numpy
 scipy
 
+# FastAPI control panel
+fastapi>=0.115,<1
+uvicorn[standard]>=0.34,<1
+
 # The `webrtcvad`/`webrtcvad-wheels` packages (pulled in transitively by
 # piper-sample-generator and microWakeWord) still do `import pkg_resources`
 # at module load time. setuptools removed that shim in 81.0 - pin below it

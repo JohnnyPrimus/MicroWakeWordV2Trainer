@@ -22,15 +22,46 @@ as a plain source directory without needing it packaged/installed.
 
 from __future__ import annotations
 
+import shutil
 import subprocess
 import sys
 import urllib.request
+from importlib.metadata import PackageNotFoundError, distribution
 from pathlib import Path
 
 from trainer.local.config import TrainerConfig
 
 MICROWAKEWORD_REPO = "https://github.com/kahrendt/microWakeWord.git"
 PIPER_SAMPLE_GENERATOR_REPO = "https://github.com/rhasspy/piper-sample-generator.git"
+REQUIRED_RUNTIME_MODULES = (
+    "microwakeword",
+    "piper",
+    "piper_sample_generator",
+    "tensorflow",
+    "torch",
+)
+MODULE_PACKAGES = {
+    "microwakeword": "microwakeword",
+    "piper": "piper-tts",
+    "piper_sample_generator": "piper-sample-generator",
+    "tensorflow": "tensorflow",
+    "torch": "torch",
+}
+
+
+def missing_modules(modules: tuple[str, ...]) -> list[str]:
+    missing = []
+    for module in modules:
+        package = MODULE_PACKAGES.get(module, module)
+        try:
+            distribution(package)
+        except PackageNotFoundError:
+            missing.append(module)
+    return missing
+
+
+def missing_runtime_modules() -> list[str]:
+    return missing_modules(REQUIRED_RUNTIME_MODULES)
 
 
 def _run(cmd: list[str], **kwargs) -> None:
@@ -40,8 +71,16 @@ def _run(cmd: list[str], **kwargs) -> None:
 
 def _clone_if_missing(repo_url: str, dest: Path) -> None:
     if dest.exists():
-        print(f"{dest} already exists, skipping clone")
-        return
+        probe = subprocess.run(
+            ["git", "-C", str(dest), "rev-parse", "--verify", "HEAD"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        if probe.returncode == 0:
+            print(f"{dest} already exists, skipping clone")
+            return
+        print(f"{dest} is an incomplete clone, removing it before retrying")
+        shutil.rmtree(dest)
     dest.parent.mkdir(parents=True, exist_ok=True)
     _run(["git", "clone", "--depth", "1", repo_url, str(dest)])
 
@@ -91,6 +130,13 @@ def run(config: TrainerConfig) -> None:
     # metrics, which needs tensorboard even though nothing actually views
     # the logs - it's not in microWakeWord's own dependency list.
     _run([sys.executable, "-m", "pip", "install", "tensorboard"])
+
+    missing = missing_runtime_modules()
+    if missing:
+        raise RuntimeError(
+            "Setup finished, but these required Python modules are still missing: "
+            + ", ".join(missing)
+        )
 
     print("\nSetup complete.")
     print(f"  microWakeWord: {config.mww_repo_dir}")

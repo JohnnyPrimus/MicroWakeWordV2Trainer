@@ -1,0 +1,13 @@
+.git
+.gitignore
+.venv
+.env
+workspace
+trainer/workspace
+__pycache__
+**/__pycache__
+*.py[cod]
+*.log
+.pytest_cache
+.mypy_cache
+.ruff_cache

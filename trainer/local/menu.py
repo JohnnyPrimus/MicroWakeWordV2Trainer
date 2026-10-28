@@ -23,6 +23,7 @@ from typing import Callable, List, Optional
 import yaml
 
 from trainer.local.config import TrainerConfig, load_config
+from trainer.local.setup_env import missing_runtime_modules
 
 
 class Cancelled(Exception):
@@ -113,7 +114,12 @@ def _has_wavs(path: Path) -> bool:
 
 
 def _setup_done(config: TrainerConfig) -> bool:
-    return config.mww_repo_dir.exists() and config.piper_repo_dir.exists() and config.piper_model_path.exists()
+    return (
+        config.mww_repo_dir.exists()
+        and config.piper_repo_dir.exists()
+        and config.piper_model_path.exists()
+        and not missing_runtime_modules()
+    )
 
 
 def _samples_done(config: TrainerConfig) -> bool:

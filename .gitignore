@@ -438,6 +438,10 @@ FodyWeavers.xsd
 # under each config's workspace directory and shouldn't be committed.
 trainer/workspace/
 trainer/wakeword_config.yaml
+
+# Docker Compose workspace (generated data/models stay local)
+/workspace/*
+!/workspace/.gitkeep
 __pycache__/
 *.pyc
 
